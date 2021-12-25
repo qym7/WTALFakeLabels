@@ -1,7 +1,7 @@
 '''
 Author: your name
 Date: 2021-12-22 20:30:23
-LastEditTime: 2021-12-23 09:46:14
+LastEditTime: 2021-12-25 20:43:31
 LastEditors: Please set LastEditors
 Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/options.py
@@ -31,8 +31,13 @@ def parse_args():
     parser.add_argument('--seed', type=int, default=-1, help='random seed (-1 for no manual seed)')
     parser.add_argument('--model_file', type=str, default=None, help='the path of pre-trained model file')
     parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--save', default=0)
     parser.add_argument('--test_dataset', default='test')
+    parser.add_argument('--supervision', default='weak')
+    parser.add_argument('--supervision_path', default='')
+    parser.add_argument('--thres', default=0.2, type=float)
+    parser.add_argument('--a1', default=1, type=float)
+    parser.add_argument('--a2', default=1, type=float)
+    parser.add_argument('--save', default=0, type=int)
 
     return init_args(parser.parse_args())
 

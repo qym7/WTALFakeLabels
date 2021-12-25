@@ -1,8 +1,16 @@
 '''
 Author: your name
+Date: 2021-12-25 17:29:12
+LastEditTime: 2021-12-25 19:59:06
+LastEditors: Please set LastEditors
+Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/model.py
+'''
+'''
+Author: your name
 Date: 2021-12-18 20:13:24
-LastEditTime: 2021-12-18 20:13:25
-LastEditors: your name
+LastEditTime: 2021-12-25 17:29:03
+LastEditors: Please set LastEditors
 Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/model.py
 '''
@@ -10,9 +18,10 @@ import torch
 import torch.nn as nn
 
 class CAS_Module(nn.Module):
-    def __init__(self, len_feature, num_classes):
+    def __init__(self, len_feature, num_classes, self_train):
         super(CAS_Module, self).__init__()
         self.len_feature = len_feature
+        self.self_train = self_train
         self.conv = nn.Sequential(
             nn.Conv1d(in_channels=self.len_feature, out_channels=2048, kernel_size=3,
                       stride=1, padding=1),
@@ -24,6 +33,13 @@ class CAS_Module(nn.Module):
                       stride=1, padding=0, bias=False)
         )
         self.drop_out = nn.Dropout(p=0.7)
+        
+        if self.self_train:
+            self.sup_classifier = nn.Sequential(
+                nn.Conv1d(in_channels=2048, out_channels=num_classes, kernel_size=1,
+                        stride=1, padding=0, bias=False)
+            )
+            self.sup_drop_out = nn.Dropout(p=0.7)
 
     def forward(self, x):
         # x: (B, T, F)
@@ -35,19 +51,29 @@ class CAS_Module(nn.Module):
         out = self.classifier(out)
         out = out.permute(0, 2, 1)
         # out: (B, T, C)
-        return out, features
+        sup_out = None
+        if self.self_train:
+            sup_out = self.sup_drop_out(features.permute(0, 2, 1))
+            sup_out = self.sup_classifier(sup_out)
+            sup_out = sup_out.permute(0, 2, 1)
+            return out, features, sup_out
+        return out, features, sup_out
 
 class Model(nn.Module):
-    def __init__(self, len_feature, num_classes, r_act, r_bkg):
+    def __init__(self, len_feature, num_classes, r_act, r_bkg,
+                 self_train):
         super(Model, self).__init__()
         self.len_feature = len_feature
         self.num_classes = num_classes
+        self.self_train = self_train
 
-        self.cas_module = CAS_Module(len_feature, num_classes)
+        self.cas_module = CAS_Module(len_feature, num_classes, self_train)
 
         self.softmax = nn.Softmax(dim=1)
 
         self.softmax_2 = nn.Softmax(dim=2)
+        if self.self_train:
+            self.sup_softmax = nn.Softmax(dim=2)
 
         self.r_act = r_act
         self.r_bkg = r_bkg
@@ -60,10 +86,13 @@ class Model(nn.Module):
         k_act = num_segments // self.r_act
         k_bkg = num_segments // self.r_bkg
 
-        cas, features = self.cas_module(x)
+        cas, features, sup_cas = self.cas_module(x)
+        sup_cas_softmax = None
+        if self.self_train:
+            sup_cas_softmax = self.sup_softmax(sup_cas)
 
         feat_magnitudes = torch.norm(features, p=2, dim=2)
-        
+
         select_idx = torch.ones_like(feat_magnitudes).cuda()
         select_idx = self.drop_out(select_idx)
 
@@ -94,5 +123,5 @@ class Model(nn.Module):
 
         cas_softmax = self.softmax_2(cas)
 
-        return score_act, score_bkg, feat_act, feat_bkg, features, cas_softmax
+        return score_act, score_bkg, feat_act, feat_bkg, features, cas_softmax, sup_cas_softmax
 

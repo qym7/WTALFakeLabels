@@ -1,8 +1,8 @@
 '''
 Author: your name
 Date: 2021-12-23 09:45:42
-LastEditTime: 2021-12-23 09:45:43
-LastEditors: your name
+LastEditTime: 2021-12-25 20:37:58
+LastEditors: Please set LastEditors
 Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/config.py
 '''
@@ -22,8 +22,6 @@ class Config(object):
             self.len_feature = 1024
         self.batch_size = args.batch_size
         self.data_path = args.data_path
-        # self.script_path = args.script_path
-        self.test_dataset = args.test_dataset
         self.save = int(args.save)
         self.model_path = args.model_path
         self.output_path = args.output_path
@@ -44,6 +42,14 @@ class Config(object):
         self.seed = args.seed
         self.feature_fps = 25
         self.num_segments = 750
+        # new args
+        self.test_dataset = args.test_dataset
+        self.supervision = args.supervision
+        self.supervision_path = args.supervision_path
+        self.thres = args.thres
+        self.a1 = args.a1
+        self.a2 = args.a2
+        self.save = bool(args.save)
 
     def __str__(self):
         attrs = vars(self)

@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 def test(net, config, logger, test_loader, test_info, step, gt,
          cls_thres=np.arange(0.1, 1, 0.1),
-         model_file=None, datatype='test'):
+         model_file=None, datatype='test', save=False):
     with torch.no_grad():
         net.eval()
 
@@ -45,7 +45,7 @@ def test(net, config, logger, test_loader, test_info, step, gt,
 
             vid_num_seg = vid_num_seg[0].cpu().item()
             num_segments = _data.shape[1]
-            score_act, _, feat_act, feat_bkg, features, cas_softmax = net(_data)
+            score_act, _, feat_act, feat_bkg, features, cas_softmax, sup_cas_softmax = net(_data)
             feat_magnitudes_act = torch.mean(torch.norm(feat_act, dim=2), dim=1)
             feat_magnitudes_bkg = torch.mean(torch.norm(feat_bkg, dim=2), dim=1)
 
@@ -82,11 +82,6 @@ def test(net, config, logger, test_loader, test_info, step, gt,
             feat_magnitudes_np = feat_magnitudes[0].cpu().data.numpy()[:, pred]
             feat_magnitudes_np = np.reshape(feat_magnitudes_np, (num_segments, -1, 1))
             feat_magnitudes_np = utils.upgrade_resolution(feat_magnitudes_np, config.scale)
-
-            pred_dict[vid_name[0]] = cas.cpu().numpy()
-            if datatype == 'val':
-                plot_pred(cas[0, :, :].cpu().numpy(), gt[vid_name[0]],
-                        vid_name[0], savefig_path)
 
             for i in range(len(config.act_thresh_cas)):
                 cas_temp = cas_pred.copy()
@@ -139,6 +134,20 @@ def test(net, config, logger, test_loader, test_info, step, gt,
 
             final_res['results'][vid_name[0]] = utils.result2json(final_proposals)
 
+            # Newly added mIoU operations
+            if sup_cas_softmax is not None:
+                cas = sup_cas_softmax
+            gt_ = gt[vid_name[0]]
+            if gt_.shape[0] > 750:
+                samples = np.arange(gt_.shape[0]) * 750 / gt_.shape[0]
+                samples = np.floor(samples)
+                cas_ = cas[0][samples].cpu().numpy()
+            else:
+                cas_ = cas[0, :, :].cpu().numpy()
+            pred_dict[vid_name[0]] = cas_
+            if save:
+                plot_pred(cas_, gt_, vid_name[0], savefig_path)
+
         test_acc = num_correct / num_total
 
         json_path = os.path.join(config.output_path, 'result.json')
@@ -159,7 +168,7 @@ def test(net, config, logger, test_loader, test_info, step, gt,
         # mIoU
         test_iou = np.zeros(len(cls_thres))
         for video_name in pred_dict:
-            cas = pred_dict[video_name][0]
+            cas = pred_dict[video_name]
             gt_video = gt[video_name]
             iou_ = np.zeros(len(cls_thres))
             for j, thres in enumerate(cls_thres):
@@ -201,7 +210,7 @@ def test(net, config, logger, test_loader, test_info, step, gt,
         # for i in range(tIoU_thresh.shape[0]):
         #     test_info['fmAP@{:.1f}'.format(tIoU_thresh[i])].append(fmAP[i])
 
-        if datatype == 'val':
+        if save:
             file_to_write = open(os.path.join(config.output_path,
                                               'val_pred_25.pickle'), 'wb')
             pickle.dump(pred_dict, file_to_write)

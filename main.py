@@ -1,7 +1,7 @@
 '''
 Author: your name
 Date: 2021-12-16 17:00:30
-LastEditTime: 2021-12-23 16:00:06
+LastEditTime: 2021-12-25 20:38:36
 LastEditors: Please set LastEditors
 Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 FilePath: /GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/main.py
@@ -36,20 +36,23 @@ if __name__ == "__main__":
 
     utils.save_config(config, os.path.join(config.output_path, "config.txt"))
 
-    net = Model(config.len_feature, config.num_classes, config.r_act, config.r_bkg)
+    net = Model(config.len_feature, config.num_classes, 
+                config.r_act, config.r_bkg,
+                config.supervision!='weak')
     net = net.cuda()
 
     train_loader = data.DataLoader(
         ThumosFeature(data_path=config.data_path, mode='train',
                         modal=config.modal, feature_fps=config.feature_fps,
-                        num_segments=config.num_segments, supervision='weak',
+                        num_segments=config.num_segments, supervision=config.supervision,
+                        supervision_path=config.supervision_path,
                         seed=config.seed, sampling='random'),
             batch_size=config.batch_size,
             shuffle=True, num_workers=config.num_workers,
             worker_init_fn=worker_init_fn)
 
     test_loader = data.DataLoader(
-        ThumosFeature(data_path=config.data_path, mode='test',
+        ThumosFeature(data_path=config.data_path, mode=config.test_dataset,
                         modal=config.modal, feature_fps=config.feature_fps,
                         num_segments=config.num_segments, supervision='weak',
                         seed=config.seed, sampling='uniform'),
@@ -57,7 +60,7 @@ if __name__ == "__main__":
             shuffle=False, num_workers=config.num_workers,
             worker_init_fn=worker_init_fn)
 
-    with open(os.path.join(ANNOT_PATH, 'test_gt_25.pickle'), 'rb') as f:
+    with open(os.path.join(ANNOT_PATH, '{}_gt_25.pickle'.format(config.test_dataset)), 'rb') as f:
         gt = pickle.load(f)
 
     cls_thres = np.arange(0.1, 1, 0.1)
@@ -72,7 +75,7 @@ if __name__ == "__main__":
     best_mIoU = -1
     best_thres = 0
 
-    criterion = UM_loss(config.alpha, config.beta, config.margin)
+    criterion = UM_loss(config.alpha, config.beta, config.margin, config.thres)
 
     optimizer = torch.optim.Adam(net.parameters(), lr=config.lr[0],
         betas=(0.9, 0.999), weight_decay=0.0005)
@@ -91,10 +94,10 @@ if __name__ == "__main__":
         if (step - 1) % len(train_loader) == 0:
             loader_iter = iter(train_loader)
 
-        train(net, loader_iter, optimizer, criterion, logger, step)
+        train(net, loader_iter, optimizer, criterion, logger, step, config.a1, config.a2)
 
         test(net, config, logger, test_loader, test_info, step, gt,
-             cls_thres=cls_thres, datatype='test')
+             cls_thres=cls_thres, datatype='test', save=config.save)
         iou = [test_info['mIoU@{:.2f}'.format(thres)][-1] for thres in cls_thres]
 
         if max(iou) > best_mIoU:

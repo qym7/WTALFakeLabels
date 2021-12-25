@@ -2,6 +2,7 @@ import torch.utils.data as data
 import os
 import csv
 import json
+import pickle
 import numpy as np
 import torch
 import pdb
@@ -12,7 +13,8 @@ import config
 
 
 class ThumosFeature(data.Dataset):
-    def __init__(self, data_path, mode, modal, feature_fps, num_segments, sampling, seed=-1, supervision='weak'):
+    def __init__(self, data_path, mode, modal, feature_fps, num_segments, sampling, seed=-1,
+                 supervision='weak', supervision_path=None):
         if seed >= 0:
             utils.set_seed(seed)
 
@@ -41,10 +43,17 @@ class ThumosFeature(data.Dataset):
         self.anno = json.load(anno_file)
         anno_file.close()
 
+        self.supervision = supervision
+        if self.supervision != 'weak':
+            if len(supervision_path) == 0:
+                raise('Supervision path is not given.')
+            anno_file = open(supervision_path, 'rb')
+            self.temp_annots = pickle.load(anno_file)
+            anno_file.close()
+
         self.class_name_to_idx = dict((v, k) for k, v in config.class_dict.items())        
         self.num_classes = len(self.class_name_to_idx.keys())
 
-        self.supervision = supervision
         self.sampling = sampling
 
 
@@ -54,7 +63,6 @@ class ThumosFeature(data.Dataset):
     def __getitem__(self, index):
         data, vid_num_seg, sample_idx = self.get_data(index)
         label, temp_anno = self.get_label(index, vid_num_seg, sample_idx)
-
         return data, label, temp_anno, self.vid_list[index], vid_num_seg
 
     def get_data(self, index):
@@ -111,29 +119,33 @@ class ThumosFeature(data.Dataset):
         if self.supervision == 'weak':
             return label, torch.Tensor(0)
         else:
-            # every segment is 16 frames: t * fps / num_seg = 16
-            # t = 16 * num_seg / fps
-            # t/num_seg = 16 / fps
-            # num_seg/t = fps / 16 (total seg num / total time)
-            temp_anno = np.zeros([vid_num_seg, self.num_classes])
-            t_factor = self.feature_fps / 16
+            # get labels from prepared pickle file
+            temp_annot = self.temp_annots[vid_name]
+            temp_annot = temp_annot[sample_idx]
+            # # get labels from json file
+            # # every segment is 16 frames: t * fps / num_seg = 16
+            # # t = 16 * num_seg / fps
+            # # t/num_seg = 16 / fps
+            # # num_seg/t = fps / 16 (total seg num / total time)
+            # temp_anno = np.zeros([vid_num_seg, self.num_classes])
+            # t_factor = self.feature_fps / 16
 
-            for class_idx in range(self.num_classes):
-                if label[class_idx] != 1:
-                    continue
+            # for class_idx in range(self.num_classes):
+            #     if label[class_idx] != 1:
+            #         continue
 
-                for _anno in classwise_anno[class_idx]:
-                    tmp_start_sec = float(_anno['segment'][0])
-                    tmp_end_sec = float(_anno['segment'][1])
+            #     for _anno in classwise_anno[class_idx]:
+            #         tmp_start_sec = float(_anno['segment'][0])
+            #         tmp_end_sec = float(_anno['segment'][1])
 
-                    tmp_start = round(tmp_start_sec * t_factor)
-                    tmp_end = round(tmp_end_sec * t_factor)
+            #         tmp_start = round(tmp_start_sec * t_factor)
+            #         tmp_end = round(tmp_end_sec * t_factor)
 
-                    temp_anno[tmp_start:tmp_end+1, class_idx] = 1
+            #         temp_anno[tmp_start:tmp_end+1, class_idx] = 1
 
-            temp_anno = temp_anno[sample_idx, :]
+            # temp_anno = temp_anno[sample_idx, :]
 
-            return label, torch.from_numpy(temp_anno)
+            return label, torch.from_numpy(temp_annot)
 
 
     def random_perturb(self, length):
@@ -152,7 +164,6 @@ class ThumosFeature(data.Dataset):
                 else:
                     samples[i] = int(samples[i])
         return samples.astype(int)
-
 
     def uniform_sampling(self, length):
         if length <= self.num_segments:

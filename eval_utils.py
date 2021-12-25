@@ -1,12 +1,3 @@
-'''
-Author: your name
-Date: 2021-12-16 17:01:15
-LastEditTime: 2021-12-23 10:49:29
-LastEditors: Please set LastEditors
-Description: evaluation plot file
-FilePath: /GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/plot.py
-'''
-
 import os
 import json
 import pickle
@@ -61,68 +52,68 @@ def save_gt():
     val_info = pd.read_csv(val_info_path).set_index('video')
     test = pd.read_csv(test_path).groupby('video')
     test_info = pd.read_csv(test_info_path).set_index('video')
-    # val_dict = {}
-    # test_dict = {}
-    # for row in val:
-    #     if row[0] in val_info.index:
-    #         feat = np.load(os.path.join(DATA_PATH, row[0]+'.npy'))
-    #         len_v = feat.shape[0]
-    #         # len_v = int(int(float(val_info.loc[row[0]]['count'])*25/30)/16)
-    #         # print(row[0], len_v, float(val_info.loc[row[0]]['count'])*25/30/16)
-    #         if len_v > 750:
-    #             val_dict[row[0]] = np.zeros((750, 20))
-                
-    #             for r in row[1].iterrows():
-    #                 if r[1]['type_idx'] != 0:
-    #                     val_dict[row[0]][int(r[1]['start']*25/16*750/len_v):
-    #                                       int(r[1]['end']*25/16*750/len_v + 1),
-    #                                       int(cls_dict[r[1]['type_idx']])] = 1
-    #         else:
-    #             val_dict[row[0]] = np.zeros((len_v, 20))
-    #             for r in row[1].iterrows():
-    #                 if r[1]['type_idx'] != 0:
-    #                     val_dict[row[0]][int(r[1]['start']*25/16):
-    #                                     int(r[1]['end']*25/16 + 1),
-    #                                     int(cls_dict[r[1]['type_idx']])] = 1
-    # for row in test:
-    #     if row[0] in test_info.index:
-    #         feat = np.load(os.path.join(DATA_TEST_PATH, row[0]+'.npy'))
-    #         len_v = feat.shape[0]
-    #         # len_v = int(int(float(test_info.loc[row[0]]['count'])*25/30)/16)
-    #         if len_v > 750:
-    #             test_dict[row[0]] = np.zeros((750, 20))
-    #             len_v = int(test_info.loc[row[0]]['count']*25/30/16)
-    #             for r in row[1].iterrows():
-    #                 if r[1]['type_idx'] != 0:
-    #                     test_dict[row[0]][int(r[1]['start']*25/16*750/len_v):
-    #                                       int(r[1]['end']*25/16*750/len_v + 1),
-    #                                       int(cls_dict[r[1]['type_idx']])] = 1
-    #         else:
-    #             test_dict[row[0]] = np.zeros((len_v, 20))
-    #             for r in row[1].iterrows():
-    #                 if r[1]['type_idx'] != 0:
-    #                     test_dict[row[0]][int(r[1]['start']*25/16):
-    #                                     int(r[1]['end']*25/16 + 1),
-    #                                     int(cls_dict[r[1]['type_idx']])] = 1
-    # file_to_write = open(os.path.join(ANNOT_PATH, 'val_gt_25.pickle'), 'wb')
-    # pickle.dump(val_dict, file_to_write)
-    # file_to_write = open(os.path.join(ANNOT_PATH, 'test_gt_25.pickle'), 'wb')
-    # pickle.dump(test_dict, file_to_write)
-    
-    gt_test = {}
-    gt_test['database'] = {}
-    for row in test:
-        if row[0] in test_info.index:
-            gt_test['database'][row[0]] = {}
-            gt_test['database'][row[0]]['annotations'] = []
+
+    val_dict = {}
+    test_dict = {}
+    for row in val:
+        if row[0] in val_info.index:
+            feat = np.load(os.path.join(DATA_PATH, row[0]+'.npy'))
+            len_v = feat.shape[0]
+            # len_v = int(int(float(val_info.loc[row[0]]['count'])*25/30)/16)
+            # print(row[0], len_v, float(val_info.loc[row[0]]['count'])*25/30/16)
+            # if len_v > 750:
+            #     val_dict[row[0]] = np.zeros((750, 20))
+            #     for r in row[1].iterrows():
+            #         if r[1]['type_idx'] != 0:
+            #             val_dict[row[0]][int(r[1]['start']*25/16*750/len_v):
+            #                               int(r[1]['end']*25/16*750/len_v + 1),
+            #                               int(cls_dict[r[1]['type_idx']])] = 1
+            # else:
+            val_dict[row[0]] = np.zeros((len_v, 20))
             for r in row[1].iterrows():
                 if r[1]['type_idx'] != 0:
-                    gt_test['database'][row[0]]['annotations'].append({
-                        'label': r[1]['type'],
-                        'segment': [float(r[1]['start']), float(r[1]['end'])]
-                    })
-    with open(os.path.join(ANNOT_PATH, 'gt_test.json'), 'w') as outfile:
-        json.dump(gt_test, outfile)
+                    val_dict[row[0]][int(r[1]['start']*25/16):
+                                    int(r[1]['end']*25/16 + 1),
+                                    int(cls_dict[r[1]['type_idx']])] = 1
+    for row in test:
+        if row[0] in test_info.index:
+            feat = np.load(os.path.join(DATA_TEST_PATH, row[0]+'.npy'))
+            len_v = feat.shape[0]
+            # len_v = int(int(float(test_info.loc[row[0]]['count'])*25/30)/16)
+            # if len_v > 750:
+            #     test_dict[row[0]] = np.zeros((750, 20))
+            #     len_v = int(test_info.loc[row[0]]['count']*25/30/16)
+            #     for r in row[1].iterrows():
+            #         if r[1]['type_idx'] != 0:
+            #             test_dict[row[0]][int(r[1]['start']*25/16*750/len_v):
+            #                               int(r[1]['end']*25/16*750/len_v + 1),
+            #                               int(cls_dict[r[1]['type_idx']])] = 1
+            # else:
+            test_dict[row[0]] = np.zeros((len_v, 20))
+            for r in row[1].iterrows():
+                if r[1]['type_idx'] != 0:
+                    test_dict[row[0]][int(r[1]['start']*25/16):
+                                    int(r[1]['end']*25/16 + 1),
+                                    int(cls_dict[r[1]['type_idx']])] = 1
+    file_to_write = open(os.path.join(ANNOT_PATH, 'val_gt_25.pickle'), 'wb')
+    pickle.dump(val_dict, file_to_write)
+    file_to_write = open(os.path.join(ANNOT_PATH, 'test_gt_25.pickle'), 'wb')
+    pickle.dump(test_dict, file_to_write)
+    
+    # gt_test = {}
+    # gt_test['database'] = {}
+    # for row in test:
+    #     if row[0] in test_info.index:
+    #         gt_test['database'][row[0]] = {}
+    #         gt_test['database'][row[0]]['annotations'] = []
+    #         for r in row[1].iterrows():
+    #             if r[1]['type_idx'] != 0:
+    #                 gt_test['database'][row[0]]['annotations'].append({
+    #                     'label': r[1]['type'],
+    #                     'segment': [float(r[1]['start']), float(r[1]['end'])]
+    #                 })
+    # with open(os.path.join(ANNOT_PATH, 'gt_test.json'), 'w') as outfile:
+    #     json.dump(gt_test, outfile)
 
 def save_pred():
     '''

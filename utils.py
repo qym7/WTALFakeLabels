@@ -90,7 +90,6 @@ def minmax_norm(act_map, min_val=None, max_val=None):
         relu = nn.ReLU()
         max_val = relu(torch.max(act_map, dim=1)[0])
         min_val = relu(torch.min(act_map, dim=1)[0])
-
     delta = max_val - min_val
     delta[delta <= 0] = 1
     ret = (act_map - min_val) / delta

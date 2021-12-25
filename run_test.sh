@@ -1,15 +1,14 @@
+output_path='./outputs/UM'
 ###
- # @Author: Yiming Qin
- # @Date: 2021-12-18 19:59:02
- # @LastEditTime: 2021-12-23 11:50:25
- # @LastEditors: Please set LastEditors
+ # @Author: your name
+ # @Date: 2021-12-25 20:15:51
+ # @LastEditTime: 2021-12-25 20:15:51
+ # @LastEditors: your name
  # @Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
- # @FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/run_eval.sh
-###
-
-output_path="./outputs/UM"
-log_path="./logs/UM"
-model_path="./models/UM_eval"
+ # @FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/run_test.sh
+### 
+log_path='./logs/UM'
+model_path='./models/UM'
 model_file='./models/UM/model_seed_0.pkl'
 data_path="/DATA7_DB7/data/cju/20/BaSNet/dataset/THUMOS14"
 test_dataset='test'

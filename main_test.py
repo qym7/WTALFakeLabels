@@ -1,7 +1,7 @@
 '''
 Author: your name
 Date: 2021-12-18 19:08:21
-LastEditTime: 2021-12-23 15:30:01
+LastEditTime: 2021-12-25 20:38:29
 LastEditors: Please set LastEditors
 Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/main_eval.py
@@ -33,9 +33,11 @@ if __name__ == "__main__":
         utils.set_seed(config.seed)
         worker_init_fn = np.random.seed(config.seed)
 
-    utils.save_config(config, os.path.join(config.output_path, "config.txt"))
+    if config.test_dataset == 'test':
+        utils.save_config(config, os.path.join(config.output_path, "config.txt"))
 
-    net = Model(config.len_feature, config.num_classes, config.r_act, config.r_bkg)
+    net = Model(config.len_feature, config.num_classes, config.r_act, config.r_bkg,
+                False)
     net = net.cuda()
 
     test_loader = data.DataLoader(
@@ -62,7 +64,8 @@ if __name__ == "__main__":
     logger = Logger(config.log_path)
 
     test(net, config, logger, test_loader, test_info, 0, gt,
-         cls_thres=cls_thres, model_file=config.model_file, datatype=config.test_dataset)
+         cls_thres=cls_thres, model_file=config.model_file,
+         datatype=config.test_dataset, save=config.save)
 
     utils.save_best_record_thumos(test_info, 
         os.path.join(config.output_path, "best_record_{}.txt".format(config.test_dataset)),
