@@ -6,7 +6,7 @@ data_path='/DATA7_DB7/data/cju/20/BaSNet/dataset/THUMOS14'
 supervision='self'
 supervision_path='/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/outputs/UM/val_pred_25.pickle'
 thres='0.2'
-a1='1'
+a1='10'
 a2='10'
 test_dataset='val'
 
