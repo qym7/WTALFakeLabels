@@ -181,7 +181,7 @@ def test(net, config, logger, test_loader, test_info, step, gt,
 
         logger.log_value('Average mIoU', test_iou.mean(), step)
         for i in range(cls_thres.shape[0]):
-            logger.log_value('mIoU@{:.1f}'.format(cls_thres[i]), test_iou[i], step)
+            logger.log_value('mIoU@{:.2f}'.format(cls_thres[i]), test_iou[i], step)
 
         # for i in range(tIoU_thresh.shape[0]):
         #     logger.log_value('Frame mAP@{:.1f}'.format(tIoU_thresh[i]), fmAP[i], step)

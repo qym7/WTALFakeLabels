@@ -1,7 +1,7 @@
 '''
 Author: your name
 Date: 2021-12-16 17:00:30
-LastEditTime: 2021-12-23 15:46:01
+LastEditTime: 2021-12-23 16:00:06
 LastEditors: Please set LastEditors
 Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 FilePath: /GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/main.py
@@ -103,7 +103,8 @@ if __name__ == "__main__":
 
             utils.save_best_record_thumos(test_info,
                 os.path.join(config.output_path, "best_record_thres_{}_seed_{}.txt".format(
-                    best_thres, config.seed)))
+                    best_thres, config.seed)),
+                    cls_thres=cls_thres)
 
             torch.save(net.state_dict(), os.path.join(args.model_path, \
                 "model_seed_{}_{}.pkl".format(best_thres, config.seed)))
