@@ -1,7 +1,7 @@
 '''
 Author: your name
 Date: 2021-12-25 17:33:51
-LastEditTime: 2021-12-25 23:58:17
+LastEditTime: 2021-12-26 12:02:48
 LastEditors: Please set LastEditors
 Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/train.py
@@ -15,13 +15,14 @@ import utils
 
 
 class UM_loss(nn.Module):
-    def __init__(self, alpha, beta, margin, thres, gamma):
+    def __init__(self, alpha, beta, lmbd, gamma, margin, thres):
         super(UM_loss, self).__init__()
         self.alpha = alpha
         self.beta = beta
+        self.lmbd = lmbd
+        self.gamma = gamma
         self.margin = margin
         self.thres = thres
-        self.gamma = gamma
         self.ce_criterion = nn.BCELoss()
         self.l2_criterion = nn.MSELoss()
     
@@ -45,7 +46,7 @@ class UM_loss(nn.Module):
         return loss
 
     def forward(self, score_act, score_bkg, feat_act, feat_bkg, label,
-                gt, sup_cas, cas_s, cas_t, a1=1, a2=2):
+                gt, sup_cas, cas_s, cas_t):
         loss = {}
         
         label = label / torch.sum(label, dim=1, keepdim=True)
@@ -67,24 +68,28 @@ class UM_loss(nn.Module):
         if sup_cas is not None:
             loss_sup = self.balanced_ce(gt, sup_cas)
             loss["loss_sup"] = loss_sup
-            loss_total = a1 * loss_total + a1 * loss_sup
+            print("loss_sup", (self.lmbd*loss_sup).detach().cpu().item())
+            loss_total = loss_total + self.lmbd * loss_sup
 
         if cas_s is not None:
             # teacher student constrainte
             loss_st = self.l2_criterion(cas_s, cas_t)
             loss_total = loss_total + self.gamma * loss_st
+            print("loss_st", (self.gamma*loss_st).detach().cpu().item())
             loss["loss_st"] = loss_st
 
         loss["loss_cls"] = loss_cls
         loss["loss_be"] = loss_be
         loss["loss_um"] = loss_um
         loss["loss_total"] = loss_total
-        print(loss)
+        print("loss_cls", loss_cls.detach().cpu().item())
+        print("loss_be", (self.beta * loss_be).detach().cpu().item())
+        print("loss_um", (self.alpha * loss_um).detach().cpu().item())
+        print("loss_total", loss_total.detach().cpu().item())
 
         return loss_total, loss
 
-def train(net_student, net_teacher, loader_iter, optimizer, criterion, logger, step,
-          a1, a2, m):
+def train(net_student, net_teacher, loader_iter, optimizer, criterion, logger, step, m):
     net_student.train()
     
     _data, _label, _gt, _, _ = next(loader_iter)
@@ -110,10 +115,10 @@ def train(net_student, net_teacher, loader_iter, optimizer, criterion, logger, s
     #     feat_magnitudes = feat_magnitudes.repeat((cas_softmax.shape[-1], 1, 1)).permute(1, 2, 0)
     #     cas = utils.minmax_norm(cas_softmax * feat_magnitudes)
 
-    if step < 10:
-        cas_softmax_s = None
+    # if step < 10:
+    #     cas_softmax_s = None
     cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
-                           _gt, sup_cas_softmax, cas_softmax_s, cas_softmax_t, a1, a2)
+                           _gt, sup_cas_softmax, cas_softmax_s, cas_softmax_t)
 
     # update student parameters by backprapagation
     cost.backward()

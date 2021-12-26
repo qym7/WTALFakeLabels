@@ -1,7 +1,7 @@
 '''
 Author: your name
 Date: 2021-12-25 17:33:51
-LastEditTime: 2021-12-25 21:31:09
+LastEditTime: 2021-12-26 11:50:35
 LastEditors: Please set LastEditors
 Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/train.py
@@ -14,10 +14,11 @@ import utils
 
 
 class UM_loss(nn.Module):
-    def __init__(self, alpha, beta, margin, thres):
+    def __init__(self, alpha, beta, lmbd, margin, thres):
         super(UM_loss, self).__init__()
         self.alpha = alpha
         self.beta = beta
+        self.lmbd = lmbd
         self.margin = margin
         self.thres = thres
         self.ce_criterion = nn.BCELoss()
@@ -42,7 +43,7 @@ class UM_loss(nn.Module):
         return loss
 
     def forward(self, score_act, score_bkg, feat_act, feat_bkg, label,
-                gt, cas, a1=1, a2=2):
+                gt, cas):
         loss = {}
         
         label = label / torch.sum(label, dim=1, keepdim=True)
@@ -64,17 +65,21 @@ class UM_loss(nn.Module):
         if cas is not None:
             loss_sup = self.balanced_ce(gt, cas)
             loss["loss_sup"] = loss_sup
-            print(loss_total, loss_sup)
-            loss_total = a1 * loss_total + a2 * loss_sup
+            loss_total = loss_total + self.lmbd * loss_sup
+            print("loss_sup", (self.lmbd*loss_sup).detach().cpu().item())
 
         loss["loss_cls"] = loss_cls
         loss["loss_be"] = loss_be
         loss["loss_um"] = loss_um
         loss["loss_total"] = loss_total
+        print("loss_cls", loss_cls.detach().cpu().item())
+        print("loss_be", (self.beta * loss_be).detach().cpu().item())
+        print("loss_um", (self.alpha * loss_um).detach().cpu().item())
+        print("loss_total", loss_total.detach().cpu().item())
 
         return loss_total, loss
 
-def train(net, loader_iter, optimizer, criterion, logger, step, a1, a2):
+def train(net, loader_iter, optimizer, criterion, logger, step):
     net.train()
     
     _data, _label, _gt, _, _ = next(loader_iter)
@@ -100,7 +105,7 @@ def train(net, loader_iter, optimizer, criterion, logger, step, a1, a2):
     #     cas = utils.minmax_norm(cas_softmax * feat_magnitudes)
 
     cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
-                           _gt, sup_cas_softmax, a1, a2)
+                           _gt, sup_cas_softmax)
 
     cost.backward()
     optimizer.step()

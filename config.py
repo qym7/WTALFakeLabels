@@ -1,7 +1,7 @@
 '''
 Author: your name
 Date: 2021-12-23 09:45:42
-LastEditTime: 2021-12-25 23:24:24
+LastEditTime: 2021-12-26 11:47:19
 LastEditors: Please set LastEditors
 Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/config.py
@@ -47,8 +47,7 @@ class Config(object):
         self.supervision = args.supervision
         self.supervision_path = args.supervision_path
         self.thres = args.thres
-        self.a1 = args.a1
-        self.a2 = args.a2
+        self.lmbd = args.lmbd
         self.save = bool(args.save)
         self.m = args.m
         self.gamma = args.gamma

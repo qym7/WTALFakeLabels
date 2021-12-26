@@ -1,7 +1,7 @@
 '''
 Author: your name
 Date: 2021-12-16 17:00:30
-LastEditTime: 2021-12-25 23:56:18
+LastEditTime: 2021-12-26 16:32:09
 LastEditors: Please set LastEditors
 Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 FilePath: /GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/main.py
@@ -79,7 +79,8 @@ if __name__ == "__main__":
     best_mIoU = -1
     best_thres = 0
 
-    criterion = UM_loss(config.alpha, config.beta, config.margin, config.thres, config.gamma)
+    criterion = UM_loss(config.alpha, config.beta, config.lmbd, config.gamma,
+                        config.margin, config.thres)
 
     optimizer = torch.optim.Adam(net_student.parameters(), lr=config.lr[0],
         betas=(0.9, 0.999), weight_decay=0.0005)
@@ -98,11 +99,11 @@ if __name__ == "__main__":
         if (step - 1) % len(train_loader) == 0:
             loader_iter = iter(train_loader)
 
-        train(net_student, net_teacher, loader_iter, optimizer, criterion, logger, step,
-              config.a1, config.a2, config.m)
+        train(net_student, net_teacher, loader_iter, optimizer, criterion, logger, step, 
+              config.m)
 
         test(net_student, config, logger, test_loader, test_info, step, gt,
-             cls_thres=cls_thres, datatype='test', save=config.save)
+             cls_thres=cls_thres, datatype='test', save=False)
         iou = [test_info['mIoU@{:.2f}'.format(thres)][-1] for thres in cls_thres]
 
         if max(iou) > best_mIoU:

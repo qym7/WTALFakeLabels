@@ -1,7 +1,7 @@
 '''
 Author: your name
 Date: 2021-12-22 20:30:23
-LastEditTime: 2021-12-25 23:23:43
+LastEditTime: 2021-12-26 11:47:29
 LastEditors: Please set LastEditors
 Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/options.py
@@ -35,8 +35,7 @@ def parse_args():
     parser.add_argument('--supervision', default='weak')
     parser.add_argument('--supervision_path', default='')
     parser.add_argument('--thres', default=0.2, type=float)
-    parser.add_argument('--a1', default=1, type=float)
-    parser.add_argument('--a2', default=1, type=float)
+    parser.add_argument('--lmbd', default=1, type=float)
     parser.add_argument('--save', default=0, type=int)
     parser.add_argument('--m', default=0.9, type=float, help='decay params for EMA')
     parser.add_argument('--gamma', default=1.0, type=float, help='loss weight for EMA')

@@ -1,7 +1,7 @@
 '''
 Author: your name
 Date: 2021-12-18 19:08:21
-LastEditTime: 2021-12-25 20:38:29
+LastEditTime: 2021-12-26 16:28:54
 LastEditors: Please set LastEditors
 Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/main_eval.py
@@ -65,12 +65,8 @@ if __name__ == "__main__":
 
     test(net, config, logger, test_loader, test_info, 0, gt,
          cls_thres=cls_thres, model_file=config.model_file,
-         datatype=config.test_dataset, save=config.save)
+         save=config.save)
 
     utils.save_best_record_thumos(test_info, 
         os.path.join(config.output_path, "best_record_{}.txt".format(config.test_dataset)),
         cls_thres=cls_thres)
-
-    # if config.save:
-    #     utils.save_best_record_thumos(test_info, 
-    #         os.path.join(config.output_path, "eval_record.txt"))

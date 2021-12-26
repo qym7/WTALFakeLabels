@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 def test(net, config, logger, test_loader, test_info, step, gt,
          cls_thres=np.arange(0.1, 1, 0.1),
-         model_file=None, datatype='test', save=False):
+         model_file=None, save=False):
     with torch.no_grad():
         net.eval()
 
