@@ -212,5 +212,5 @@ def test(net, config, logger, test_loader, test_info, step, gt,
 
         if save:
             file_to_write = open(os.path.join(config.output_path,
-                                              'val_pred_25.pickle'), 'wb')
+                                              '{}_pred_25.pickle'.format(config.test_dataset)), 'wb')
             pickle.dump(pred_dict, file_to_write)

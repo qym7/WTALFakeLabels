@@ -1,7 +1,7 @@
 '''
 Author: your name
 Date: 2021-12-16 17:00:30
-LastEditTime: 2021-12-26 16:31:10
+LastEditTime: 2021-12-28 14:32:07
 LastEditors: Please set LastEditors
 Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 FilePath: /GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/main.py
@@ -73,8 +73,8 @@ if __name__ == "__main__":
     test_info.update(iou_info)
     best_mAP = -1
     cls_thres = np.arange(0.1, 1, 0.1)
-    # best_mIoU = -1
-    # best_thres = 0
+    best_mIoU = -1
+    best_thres = 0
 
     criterion = UM_loss(config.alpha, config.beta, config.lmbd,
                         config.margin, config.thres)
@@ -100,21 +100,22 @@ if __name__ == "__main__":
 
         test(net, config, logger, test_loader, test_info, step, gt,
              cls_thres=cls_thres, save=False)
-        
+
         iou = [test_info['mIoU@{:.2f}'.format(thres)][-1] for thres in cls_thres]
-        
+
         # save model by mIoU
         if max(iou) > best_mIoU:
             best_mIoU = max(iou)
             best_thres = cls_thres[np.argmax(np.array(iou))]
 
             utils.save_best_record_thumos(test_info,
-                os.path.join(config.output_path, "best_record_thres_{}_seed_{}.txt".format(
-                    best_thres, config.seed)),
-                    cls_thres=cls_thres)
+                os.path.join(config.output_path, "best_record_seed_{}.txt".format(
+                    config.seed)),
+                    cls_thres=cls_thres,
+                    best_thres=best_thres)
 
             torch.save(net.state_dict(), os.path.join(args.model_path, \
-                "model_seed_{}_{}.pkl".format(best_thres, config.seed)))
+                "model_seed_{}.pkl".format(config.seed)))
 
         logger.log_value('Best mIoU threshold', best_thres, step)
         logger.log_value('Best mIoU', best_mIoU, step)
@@ -140,4 +141,5 @@ if __name__ == "__main__":
 
     utils.save_best_record_thumos(test_info,
         os.path.join(config.output_path, "full_record_seed_{}.txt".format(config.seed)),
-        cls_thres=cls_thres)
+        cls_thres=cls_thres,
+        best_thres=best_thres)

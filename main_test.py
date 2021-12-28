@@ -1,7 +1,7 @@
 '''
 Author: your name
 Date: 2021-12-18 19:08:21
-LastEditTime: 2021-12-26 16:28:54
+LastEditTime: 2021-12-28 14:10:41
 LastEditors: Please set LastEditors
 Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/main_eval.py
@@ -52,7 +52,7 @@ if __name__ == "__main__":
                            '{}_gt_25.pickle'.format(config.test_dataset)), 'rb') as f:
         gt = pickle.load(f)
 
-    cls_thres = np.arange(0.1, 0.3, 0.01)
+    cls_thres = np.arange(0.1, 1, 0.1)
     test_info = {"step": [], "test_acc": [],
                  "average_mAP": [],
                  "mAP@0.1": [], "mAP@0.2": [], "mAP@0.3": [], 
@@ -68,5 +68,5 @@ if __name__ == "__main__":
          save=config.save)
 
     utils.save_best_record_thumos(test_info, 
-        os.path.join(config.output_path, "best_record_{}.txt".format(config.test_dataset)),
+        os.path.join(config.output_path, "test_record_{}.txt".format(config.test_dataset)),
         cls_thres=cls_thres)

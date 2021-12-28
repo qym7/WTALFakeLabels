@@ -66,11 +66,13 @@ def grouping(arr):
     return np.split(arr, np.where(np.diff(arr) != 1)[0] + 1)
 
 
-def save_best_record_thumos(test_info, file_path, cls_thres):
+def save_best_record_thumos(test_info, file_path, cls_thres, best_thres=None):
     fo = open(file_path, "w")
     fo.write("Step: {}\n".format(test_info["step"][-1]))
     fo.write("Test_acc: {:.4f}\n".format(test_info["test_acc"][-1]))
     fo.write("average_mAP: {:.4f}\n".format(test_info["average_mAP"][-1]))
+    if best_thres is not None:
+        fo.write("best_thres: {:.2f}\n".format(best_thres))
 
     tIoU_thresh = np.linspace(0.1, 0.7, 7)
     for i in range(len(tIoU_thresh)):

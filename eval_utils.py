@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 from config import class_dict
 
-ANNOT_PATH = '/GPFS/data/yimingqin/datasets/thumos_annotations'
+ANNOT_PATH = '/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/dataset/thumos_annotations'
 DATA_PATH = '/DATA7_DB7/data/cju/20/BaSNet/dataset/THUMOS14/features/val/flow'
 DATA_TEST_PATH = '/DATA7_DB7/data/cju/20/BaSNet/dataset/THUMOS14/features/test/flow'
 
@@ -34,6 +34,13 @@ cls_dict = {7: 0,
             92: 17,
             93: 18,
             97: 19}
+
+
+def reverse_dict(dict):
+    new_dict = {}
+    for i in dict:
+        new_dict[dict[i]] = i
+    return new_dict
 
 
 def save_gt():
@@ -115,6 +122,54 @@ def save_gt():
     # with open(os.path.join(ANNOT_PATH, 'gt_test.json'), 'w') as outfile:
     #     json.dump(gt_test, outfile)
 
+def turn_time2frame(file_folder, thres):
+    name_dict = reverse_dict(class_dict)
+    file_path = os.path.join(file_folder, 'result.json')
+    with open(file_path, 'rb') as f:
+        res_time = json.load(f)['results']
+    res_frame = {}
+    for vid_name in res_time:
+        feat = np.load(os.path.join(DATA_PATH, vid_name+'.npy'))
+        len_v = feat.shape[0]
+        res_ = np.zeros((len_v, 20))
+        for i in range(len(res_time[vid_name])):
+            annot_ = res_time[vid_name][i]
+            if annot_['score'] > thres:
+                str_ = annot_['segment'][0]
+                end_ = annot_['segment'][1]
+                res_[int(str_*25/16):
+                    int(end_*25/16 + 1),
+                    int(name_dict[annot_['label']])] = 1
+
+        res_frame[vid_name] = res_
+
+    # file_to_write = open(os.path.join(file_folder, 'Wval_pred_25.pickle'), 'wb')
+    # pickle.dump(res_frame, file_to_write)
+    return res_frame
+
+def test_iou(file_folder):
+    with open(os.path.join(ANNOT_PATH, 'val_gt_25.pickle'), 'rb') as f:
+        gt = pickle.load(f)
+    score_thres = np.arange(0, 1, 0.01)
+    test_iou = np.zeros(len(score_thres))
+    for j, thres in enumerate(score_thres):
+        wpred = turn_time2frame(file_folder, thres)
+        iou_ = 0
+        for video_name in wpred:
+            cas = wpred[video_name]
+            gt_video = gt[video_name]
+            bingo_count = 0
+            total_count = 0
+            for i in range(gt_video.shape[-1]):
+                if sum(gt_video[:, i]) > 0:
+                    pred = cas[:, i] > thres
+                    bingo_count += np.sum(gt_video[:, i]==pred)
+                    total_count += len(pred)
+            iou_ += bingo_count/total_count
+        test_iou[j] = iou_/len(gt)
+        print(thres, test_iou[j])
+
+
 def save_pred():
     '''
     Function to save action classification prediction with following rules:
@@ -172,4 +227,6 @@ def plot_pred(cas, gt, video_name, save_path):
                            video_name, save_path)
 
 if __name__ == '__main__':
-    save_gt()
+    # save_gt()
+    # turn_time2frame('/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/outputs/UM')
+    test_iou('/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/outputs/UM')

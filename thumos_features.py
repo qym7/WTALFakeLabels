@@ -147,7 +147,6 @@ class ThumosFeature(data.Dataset):
 
             return label, torch.from_numpy(temp_annot)
 
-
     def random_perturb(self, length):
         if self.num_segments == length:
             return np.arange(self.num_segments).astype(int)

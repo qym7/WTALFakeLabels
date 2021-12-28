@@ -1,11 +1,3 @@
-'''
-Author: your name
-Date: 2021-12-16 17:00:30
-LastEditTime: 2021-12-26 16:32:09
-LastEditors: Please set LastEditors
-Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
-FilePath: /GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/main.py
-'''
 import pickle
 import pdb
 import numpy as np
@@ -106,25 +98,44 @@ if __name__ == "__main__":
              cls_thres=cls_thres, datatype='test', save=False)
         iou = [test_info['mIoU@{:.2f}'.format(thres)][-1] for thres in cls_thres]
 
+        # save model by mIoU
         if max(iou) > best_mIoU:
             best_mIoU = max(iou)
             best_thres = cls_thres[np.argmax(np.array(iou))]
 
             utils.save_best_record_thumos(test_info,
-                os.path.join(config.output_path, "best_record_thres_{}_seed_{}.txt".format(
-                    best_thres, config.seed)),
-                    cls_thres=cls_thres)
+                os.path.join(config.output_path, "best_record_seed_{}.txt".format(
+                    config.seed)),
+                    cls_thres=cls_thres,
+                    best_thres=best_thres)
 
-            torch.save(net_student.state_dict(), os.path.join(args.model_path, \
-                "model_seed_{}_{}.pkl".format(best_thres, config.seed)))
+            torch.save(net.state_dict(), os.path.join(args.model_path, \
+                "model_seed_{}.pkl".format(config.seed)))
 
         logger.log_value('Best mIoU threshold', best_thres, step)
         logger.log_value('Best mIoU', best_mIoU, step)
 
-        print('--Average mIoU ', round(test_info['average_mIoU'][-1], 4),
+        print(config.model_path.split('/')[-1],
+              '--Average mIoU ', round(test_info['average_mIoU'][-1], 4),
               '--Best mIoU ', round(best_mIoU, 4),
               '--Best mIoU Thres ', round(best_thres, 4))
+        
+        # # save model by mAP
+        # if test_info["average_mAP"][-1] > best_mAP:
+        #     best_mAP = test_info["average_mAP"][-1]
+
+        #     utils.save_best_record_thumos(test_info, 
+        #         os.path.join(config.output_path, "best_record_seed_{}.txt".format(config.seed)),
+        #         cls_thres=cls_thres)
+
+        #     torch.save(net.state_dict(), os.path.join(args.model_path, \
+        #         "model_seed_{}.pkl".format(config.seed)))
+        # print(config.model_path.split('/')[-1],
+        #       'mAP', test_info["average_mAP"][-1],
+        #       'mIoU', test_info["average_mIoU"][-1])
 
     utils.save_best_record_thumos(test_info,
-        os.path.join(config.output_path, "best_record_seed_{}.txt".format(config.seed)),
-        cls_thres=cls_thres)
+        os.path.join(config.output_path, "full_record_seed_{}.txt".format(config.seed)),
+        cls_thres=cls_thres,
+        best_thres=best_thres)
+
