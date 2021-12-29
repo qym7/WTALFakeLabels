@@ -1,7 +1,7 @@
 '''
 Author: your name
 Date: 2021-12-25 17:29:12
-LastEditTime: 2021-12-25 19:59:06
+LastEditTime: 2021-12-29 10:19:42
 LastEditors: Please set LastEditors
 Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
 FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/model.py
@@ -40,6 +40,16 @@ class CAS_Module(nn.Module):
                         stride=1, padding=0, bias=False)
             )
             self.sup_drop_out = nn.Dropout(p=0.7)
+            self.mlp = nn.Sequential(
+                        nn.Linear(num_classes, num_classes),
+                        nn.ReLU(),
+                        nn.Dropout(0.1),
+                        nn.Linear(num_classes, num_classes),
+                        nn.ReLU(),
+                        nn.Dropout(0.1),
+                        nn.Linear(num_classes, num_classes)
+            )
+            self.sup_drop_out = nn.Dropout(p=0.7)
 
     def forward(self, x):
         # x: (B, T, F)
@@ -53,9 +63,11 @@ class CAS_Module(nn.Module):
         # out: (B, T, C)
         sup_out = None
         if self.self_train:
-            sup_out = self.sup_drop_out(features.permute(0, 2, 1))
-            sup_out = self.sup_classifier(sup_out)
-            sup_out = sup_out.permute(0, 2, 1)
+            # sup_out = self.sup_drop_out(features.permute(0, 2, 1))
+            # sup_out = self.sup_classifier(sup_out)
+            # sup_out = sup_out.permute(0, 2, 1)
+            # sup_out = self.mlp(sup_out)
+            sup_out = self.mlp(out)
             return out, features, sup_out
         return out, features, sup_out
 
@@ -72,8 +84,6 @@ class Model(nn.Module):
         self.softmax = nn.Softmax(dim=1)
 
         self.softmax_2 = nn.Softmax(dim=2)
-        if self.self_train:
-            self.sup_softmax = nn.Softmax(dim=2)
 
         self.r_act = r_act
         self.r_bkg = r_bkg
@@ -89,7 +99,7 @@ class Model(nn.Module):
         cas, features, sup_cas = self.cas_module(x)
         sup_cas_softmax = None
         if self.self_train:
-            sup_cas_softmax = self.sup_softmax(sup_cas)
+            sup_cas_softmax = self.softmax_2(sup_cas)
 
         feat_magnitudes = torch.norm(features, p=2, dim=2)
 

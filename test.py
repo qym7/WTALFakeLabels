@@ -45,7 +45,7 @@ def test(net, config, logger, test_loader, test_info, step, gt,
 
             vid_num_seg = vid_num_seg[0].cpu().item()
             num_segments = _data.shape[1]
-            score_act, _, feat_act, feat_bkg, features, cas_softmax, sup_cas_softmax = net(_data)
+            score_act, _, feat_act, feat_bkg, features, cas_softmax, mlp_cas_softmax, sup_cas_softmax = net(_data)
             feat_magnitudes_act = torch.mean(torch.norm(feat_act, dim=2), dim=1)
             feat_magnitudes_bkg = torch.mean(torch.norm(feat_bkg, dim=2), dim=1)
 
