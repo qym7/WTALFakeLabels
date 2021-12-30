@@ -45,7 +45,7 @@ def test(net, config, logger, test_loader, test_info, step, gt,
 
             vid_num_seg = vid_num_seg[0].cpu().item()
             num_segments = _data.shape[1]
-            score_act, _, feat_act, feat_bkg, features, cas_softmax, mlp_cas_softmax, sup_cas_softmax = net(_data)
+            score_act, _, feat_act, feat_bkg, features, cas_softmax, sup_cas_softmax = net(_data)
             feat_magnitudes_act = torch.mean(torch.norm(feat_act, dim=2), dim=1)
             feat_magnitudes_bkg = torch.mean(torch.norm(feat_bkg, dim=2), dim=1)
 
@@ -135,8 +135,8 @@ def test(net, config, logger, test_loader, test_info, step, gt,
             final_res['results'][vid_name[0]] = utils.result2json(final_proposals)
 
             # Newly added mIoU operations
-            if sup_cas_softmax is not None:
-                cas = sup_cas_softmax
+            # if sup_cas_softmax is not None:
+            #     cas = sup_cas_softmax
             gt_ = gt[vid_name[0]]
             if gt_.shape[0] > 750:
                 samples = np.arange(gt_.shape[0]) * 750 / gt_.shape[0]
