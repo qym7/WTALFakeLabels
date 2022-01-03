@@ -1,11 +1,3 @@
-'''
-Author: your name
-Date: 2021-12-18 19:08:21
-LastEditTime: 2021-12-28 14:10:41
-LastEditors: Please set LastEditors
-Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
-FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/main_eval.py
-'''
 import pickle
 import pdb
 import numpy as np

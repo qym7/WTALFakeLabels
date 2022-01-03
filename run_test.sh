@@ -1,7 +1,7 @@
-output_path='./outputs/UM-IoU-val'
-log_path='./logs/UM-IoU-val'
-model_path='./models/UM-IoU-val'
-model_file='./models/UM-IoU-val/model_seed_0.pkl'
+output_path='./outputs/UM-val'
+log_path='./logs/UM-val'
+model_path='./models/UM-val'
+model_file='./models/UM-val/model_seed_0.pkl'
 data_path="/DATA7_DB7/data/cju/20/BaSNet/dataset/THUMOS14"
 test_dataset='val'
 save='1'

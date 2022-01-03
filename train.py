@@ -1,11 +1,3 @@
-'''
-Author: your name
-Date: 2021-12-25 17:33:51
-LastEditTime: 2021-12-29 10:10:07
-LastEditors: Please set LastEditors
-Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
-FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/train.py
-'''
 import torch
 import torch.nn as nn
 import numpy as np
@@ -22,22 +14,46 @@ class UM_loss(nn.Module):
         self.margin = margin
         self.thres = thres
         self.ce_criterion = nn.BCELoss()
-    
+
     def balanced_ce(self, gt, cas):
         loss = 0
         count = 0
-        pmask = (gt > self.thres).float().cuda()
+        # pmask = (cas > self.thres).float().cuda()
+        # pmask = (gt == 1).float().cuda()
+        # cas = cas.reshape(cas.shape[0], -1)
+        # gt = cas.reshape(gt.shape[0], -1)
         for i in range(cas.shape[0]):
             for j in range(cas.shape[-1]):
-                if pmask[i, :, j].sum() > 0:
-                    r = sum(pmask[i, :, j]==1) / float(pmask.shape[1])
-                    coef_0 = 0.5 * r / (r - 1)
-                    coef_1 = coef_0 * (r - 1)
-                    # _loss = coef_1 * pmask[i, :, j] * torch.log(cas[i, :, j] + 0.00001) +\
-                    #         coef_0 * (1.0 - pmask[i, :, j]) * torch.log(1.0 - cas[i, :, j] + 0.00001)
-                    _loss = torch.norm(cas[i, :, j] - pmask[i, :, j], p=2)
+                if gt[i, :, j].sum() > 0:
+                    r = float(gt.shape[1]) / sum(gt[i, :, j]==1)
+                    if r == 1:
+                        coef_0 = torch.tensor(0).cuda()
+                        coef_1 = torch.tensor(1).cuda()
+                    else:
+                        coef_0 = 0.5 * r / (r - 1)
+                        coef_1 = coef_0 * (r - 1)
+                    _cas = cas[i, : ,j]
+                    _loss_1 = - coef_1 * gt[i, :, j] * torch.log(_cas + 0.00001)
+                    _loss_0 = - coef_0 * (1.0 - gt[i, :, j]) * torch.log(1.0 - _cas + 0.00001)
+                    _loss = _loss_1 + _loss_0
+                    print('min', round(cas[i, :, j].min().detach().cpu().item(), 3),
+                          'max', round(cas[i, :, j].max().detach().cpu().item(), 3),
+                          'loss1', round(coef_1.detach().cpu().item(), 3), round(_loss_1.mean().detach().cpu().item(), 3),
+                          'loss0', round(coef_0.detach().cpu().item(), 3), round(_loss_0.mean().detach().cpu().item(), 3))
+                    # _loss = torch.norm(cas[i, :, j] - gt[i, :, j], p=2)
                     loss = loss + torch.mean(_loss)
+                    # print(coef_0, coef_1)
                     count += 1
+            # r = float(gt.shape[1]) / sum(gt[i]==1)
+            # if r == 1:
+            #     r = r + 0.00001
+            # coef_0 = 0.5 * r / (r - 1)
+            # coef_1 = coef_0 * (r - 1)
+            # _loss = coef_1 * gt[i] * torch.log(cas[i] + 0.00001) +\
+            #         coef_0 * (1.0 - gt[i]) * torch.log(1.0 - cas[i] + 0.00001)
+            # _loss = _loss * -1
+            # loss = loss + torch.mean(_loss)
+            # count += 1
         loss = loss / count
 
         return loss

@@ -1,11 +1,3 @@
-'''
-Author: your name
-Date: 2021-12-16 17:00:30
-LastEditTime: 2021-12-28 14:32:07
-LastEditors: Please set LastEditors
-Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
-FilePath: /GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/main.py
-'''
 import pickle
 import pdb
 import numpy as np
@@ -29,7 +21,15 @@ if __name__ == "__main__":
 
     config = Config(args)
     worker_init_fn = None
-   
+    
+    # =================== booking a gpu ==================
+    # careful, you have to first load the data
+    print('current device: ', torch.cuda.current_device())
+    free_gpu_id = int(utils.get_free_gpu())
+    print('free gpu: ', free_gpu_id)
+    torch.cuda.set_device(free_gpu_id)
+    print('current device: ', torch.cuda.current_device())
+
     if config.seed >= 0:
         utils.set_seed(config.seed)
         worker_init_fn = np.random.seed(config.seed)
@@ -68,12 +68,14 @@ if __name__ == "__main__":
                  "average_mAP": [],
                  "mAP@0.1": [], "mAP@0.2": [], "mAP@0.3": [], 
                  "mAP@0.4": [], "mAP@0.5": [], "mAP@0.6": [], "mAP@0.7": [],
-                 "average_mIoU": []}
+                 "average_mIoU": [], "average_bkg_mIoU": [], "average_act_mIoU": []}
     iou_info = {'mIoU@{:.2f}'.format(thres): [] for thres in cls_thres}
+    iou_info.update({'bkg_mIoU@{:.2f}'.format(thres): [] for thres in cls_thres})
+    iou_info.update({'act_mIoU@{:.2f}'.format(thres): [] for thres in cls_thres})
     test_info.update(iou_info)
     best_mAP = -1
     cls_thres = np.arange(0.1, 1, 0.1)
-    best_mIoU = -1
+    best_mIoU = best_bkg_mIoU = best_act_mIoU = -1
     best_thres = 0
 
     criterion = UM_loss(config.alpha, config.beta, config.lmbd,
@@ -105,11 +107,15 @@ if __name__ == "__main__":
 
         # save model by mIoU
         if max(iou) > best_mIoU:
+            iou_idx = np.argmax(np.array(iou))
             best_mIoU = max(iou)
-            best_thres = cls_thres[np.argmax(np.array(iou))]
+            best_thres = cls_thres[iou_idx]
+            best_bkg_mIoU = test_info['bkg_mIoU@{:.2f}'.format(best_thres)][0]
+            best_act_mIoU = test_info['act_mIoU@{:.2f}'.format(best_thres)][0]
 
             utils.save_best_record_thumos(test_info,
-                os.path.join(config.output_path, "best_record_seed_{}.txt".format(
+                os.path.join(config.output_path, "best_record_{}_seed_{}.txt".format(
+                    config.test_dataset,
                     config.seed)),
                     cls_thres=cls_thres,
                     best_thres=best_thres)
@@ -123,23 +129,29 @@ if __name__ == "__main__":
         print(config.model_path.split('/')[-1],
               '--Average mIoU ', round(test_info['average_mIoU'][-1], 4),
               '--Best mIoU ', round(best_mIoU, 4),
-              '--Best mIoU Thres ', round(best_thres, 4))
+              '--Best mIoU Thres ', round(best_thres, 4),
+              '--Bkg mIoU ', round(best_bkg_mIoU, 4),
+              '--Act mIoU ', round(best_act_mIoU, 4))
         
         # # save model by mAP
         # if test_info["average_mAP"][-1] > best_mAP:
         #     best_mAP = test_info["average_mAP"][-1]
 
         #     utils.save_best_record_thumos(test_info, 
-        #         os.path.join(config.output_path, "best_record_seed_{}.txt".format(config.seed)),
+        #         os.path.join(config.output_path, "best_record_{}_seed_{}.txt".format(
+        #             config.test_dataset,
+        #             config.seed)),
         #         cls_thres=cls_thres)
 
         #     torch.save(net.state_dict(), os.path.join(args.model_path, \
         #         "model_seed_{}.pkl".format(config.seed)))
-        # print(config.model_path.split('/')[-1],
-        #       'mAP', test_info["average_mAP"][-1],
-        #       'mIoU', test_info["average_mIoU"][-1])
+
+        print(config.model_path.split('/')[-1],
+              'mAP', round(test_info["average_mAP"][-1], 4))
+            #   'mIoU', test_info["average_mIoU"][-1])
 
     utils.save_best_record_thumos(test_info,
-        os.path.join(config.output_path, "full_record_seed_{}.txt".format(config.seed)),
+        os.path.join(config.output_path, "full_record_{}_seed_{}.txt".format(config.test_dataset,
+                                                                             config.seed)),
         cls_thres=cls_thres,
         best_thres=best_thres)

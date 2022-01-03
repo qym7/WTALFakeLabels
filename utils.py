@@ -71,8 +71,6 @@ def save_best_record_thumos(test_info, file_path, cls_thres, best_thres=None):
     fo.write("Step: {}\n".format(test_info["step"][-1]))
     fo.write("Test_acc: {:.4f}\n".format(test_info["test_acc"][-1]))
     fo.write("average_mAP: {:.4f}\n".format(test_info["average_mAP"][-1]))
-    if best_thres is not None:
-        fo.write("best_thres: {:.2f}\n".format(best_thres))
 
     tIoU_thresh = np.linspace(0.1, 0.7, 7)
     for i in range(len(tIoU_thresh)):
@@ -80,9 +78,18 @@ def save_best_record_thumos(test_info, file_path, cls_thres, best_thres=None):
 
     # cls_thres = np.arange(0.1, 1, 0.1)
     fo.write("average_mIoU: {:.4f}\n".format(test_info["average_mIoU"][-1]))
+    if best_thres is not None:
+        fo.write("best_thres: {:.2f}\n".format(best_thres))
     for i in range(len(cls_thres)):
         fo.write("mIoU@{:.2f}: {:.4f}\n".format(cls_thres[i], test_info["mIoU@{:.2f}".format(cls_thres[i])][-1]))
 
+    fo.write("average_bkg_mIoU: {:.4f}\n".format(test_info["average_bkg_mIoU"][-1]))
+    for i in range(len(cls_thres)):
+        fo.write("bkg_mIoU@{:.2f}: {:.4f}\n".format(cls_thres[i], test_info["bkg_mIoU@{:.2f}".format(cls_thres[i])][-1]))
+
+    fo.write("average_act_mIoU: {:.4f}\n".format(test_info["average_act_mIoU"][-1]))
+    for i in range(len(cls_thres)):
+        fo.write("act_mIoU@{:.2f}: {:.4f}\n".format(cls_thres[i], test_info["act_mIoU@{:.2f}".format(cls_thres[i])][-1]))
     
     fo.close()
 
@@ -142,3 +149,10 @@ def save_config(config, file_path):
     fo.write("Configurtaions:\n")
     fo.write(str(config))
     fo.close()
+    
+    
+def get_free_gpu():
+    os.system('nvidia-smi -q -d Memory |grep -A4 GPU|grep Free >tmp')
+    memory_available = [int(x.split()[2]) for
+                        x in open('tmp', 'r').readlines()]
+    return np.argmax(memory_available)

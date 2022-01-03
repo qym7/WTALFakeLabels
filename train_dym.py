@@ -37,7 +37,7 @@ class UM_loss(nn.Module):
     def forward(self, score_act, score_bkg, feat_act, feat_bkg, label,
                 gt, cas):
         loss = {}
-        
+
         label = label / torch.sum(label, dim=1, keepdim=True)
 
         loss_cls = self.ce_criterion(score_act, label)

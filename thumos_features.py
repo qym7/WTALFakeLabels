@@ -22,7 +22,7 @@ class ThumosFeature(data.Dataset):
         self.modal = modal
         self.feature_fps = feature_fps
         self.num_segments = num_segments
-        _mode = 'test' if self.mode == 'test' else 'val' 
+        _mode = 'test' if self.mode == 'test' else 'val'
 
         if self.modal == 'all':
             self.feature_path = []
@@ -142,7 +142,6 @@ class ThumosFeature(data.Dataset):
             #         tmp_end = round(tmp_end_sec * t_factor)
 
             #         temp_anno[tmp_start:tmp_end+1, class_idx] = 1
-
             # temp_anno = temp_anno[sample_idx, :]
 
             return label, torch.from_numpy(temp_annot)

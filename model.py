@@ -1,19 +1,3 @@
-'''
-Author: your name
-Date: 2021-12-25 17:29:12
-LastEditTime: 2021-12-29 10:48:32
-LastEditors: Please set LastEditors
-Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
-FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/model.py
-'''
-'''
-Author: your name
-Date: 2021-12-18 20:13:24
-LastEditTime: 2021-12-25 17:29:03
-LastEditors: Please set LastEditors
-Description: 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
-FilePath: /yimingqin/code/WTAL-Uncertainty-Modeling/model.py
-'''
 import torch
 import torch.nn as nn
 
@@ -99,7 +83,7 @@ class Model(nn.Module):
         cas, features, sup_cas = self.cas_module(x)
         sup_cas_softmax = None
         if self.self_train:
-            sup_cas_softmax = self.softmax_2(sup_cas)
+            sup_cas_softmax = self.softmax_2(sup_cas+0.01)
 
         feat_magnitudes = torch.norm(features, p=2, dim=2)
 

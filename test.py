@@ -135,8 +135,8 @@ def test(net, config, logger, test_loader, test_info, step, gt,
             final_res['results'][vid_name[0]] = utils.result2json(final_proposals)
 
             # Newly added mIoU operations
-            # if sup_cas_softmax is not None:
-            #     cas = sup_cas_softmax
+            if sup_cas_softmax is not None:
+                cas = sup_cas_softmax
             gt_ = gt[vid_name[0]]
             if gt_.shape[0] > 750:
                 samples = np.arange(gt_.shape[0]) * 750 / gt_.shape[0]
@@ -167,10 +167,14 @@ def test(net, config, logger, test_loader, test_info, step, gt,
 
         # mIoU
         test_iou = np.zeros(len(cls_thres))
+        bkg_iou = np.zeros(len(cls_thres))
+        act_iou = np.zeros(len(cls_thres))
         for video_name in pred_dict:
             cas = pred_dict[video_name]
             gt_video = gt[video_name]
             iou_ = np.zeros(len(cls_thres))
+            bkg_iou_ = np.zeros(len(cls_thres))
+            act_iou_ = np.zeros(len(cls_thres))
             for j, thres in enumerate(cls_thres):
                 bingo_count = 0
                 total_count = 0
@@ -178,10 +182,20 @@ def test(net, config, logger, test_loader, test_info, step, gt,
                     if sum(gt_video[:, i]) > 0:
                         pred = cas[:, i] > thres
                         bingo_count += np.sum(gt_video[:, i]==pred)
+                        bkg_count = np.sum(np.logical_and(gt_video[:, i]==pred,
+                                                          gt_video[:, i]==0))
+                        act_count = np.sum(np.logical_and(gt_video[:, i]==pred,
+                                                          gt_video[:, i]==1))
                         total_count += len(pred)
                 iou_[j] = bingo_count/total_count
+                bkg_iou_[j] = bkg_count/total_count
+                act_iou_[j] = act_count/total_count
             test_iou += iou_
+            bkg_iou += bkg_iou_
+            act_iou += act_iou_
         test_iou = test_iou/len(pred_dict)
+        bkg_iou = bkg_iou/len(pred_dict)
+        act_iou = act_iou/len(pred_dict)
 
         logger.log_value('Test accuracy', test_acc, step)
         logger.log_value('Average mAP', average_mAP, step)
@@ -205,6 +219,14 @@ def test(net, config, logger, test_loader, test_info, step, gt,
         test_info['average_mIoU'].append(test_iou.mean())
         for i in range(cls_thres.shape[0]):
             test_info['mIoU@{:.2f}'.format(cls_thres[i])].append(test_iou[i])
+
+        test_info['average_bkg_mIoU'].append(test_iou.mean())
+        for i in range(cls_thres.shape[0]):
+            test_info['bkg_mIoU@{:.2f}'.format(cls_thres[i])].append(bkg_iou[i])
+
+        test_info['average_act_mIoU'].append(test_iou.mean())
+        for i in range(cls_thres.shape[0]):
+            test_info['act_mIoU@{:.2f}'.format(cls_thres[i])].append(act_iou[i])
 
         # test_info['average_fmAP'].append(average_fmAP)
         # for i in range(tIoU_thresh.shape[0]):
