@@ -44,10 +44,12 @@ class Config(object):
         self.num_segments = 750
         # new args
         self.test_dataset = args.test_dataset
+        self.test_head = args.test_head
         self.supervision = args.supervision
         self.supervision_path = args.supervision_path
         self.thres = args.thres
         self.lmbd = args.lmbd
+        self.bkg_lmbd = args.bkg_lmbd
         self.save = bool(args.save)
         self.m = args.m
         self.gamma = args.gamma

@@ -156,3 +156,54 @@ def get_free_gpu():
     memory_available = [int(x.split()[2]) for
                         x in open('tmp', 'r').readlines()]
     return np.argmax(memory_available)
+
+def get_cas(gt, cas):
+    if gt.shape[0] > 750:
+        samples = np.arange(gt.shape[0]) * 750 / gt.shape[0]
+        samples = np.floor(samples)
+        cas_ = cas[0][samples].cpu().numpy()
+    else:
+        cas_ = cas[0, :, :].cpu().numpy()
+    return cas_
+
+def calculate_iou(gt, pred_dict, cls_thres):
+    test_iou = np.zeros(len(cls_thres))
+    bkg_iou = np.zeros(len(cls_thres))
+    act_iou = np.zeros(len(cls_thres))
+    for video_name in pred_dict:
+        cas = pred_dict[video_name]
+        gt_video = gt[video_name]
+        iou_ = np.zeros(len(cls_thres))
+        bkg_iou_ = np.zeros(len(cls_thres))
+        act_iou_ = np.zeros(len(cls_thres))
+        for j, thres in enumerate(cls_thres):
+            bingo_count = 0
+            total_count = 0
+            bkg_count = 0
+            act_count = 0
+            bkg_total_count = 0
+            for i in range(gt_video.shape[-1]):
+                if sum(gt_video[:, i]) > 0:
+                    pred = cas[:, i] > thres
+                    bingo_count += np.sum(gt_video[:, i]==pred)
+                    bkg_count += np.sum(np.logical_and(gt_video[:, i]==pred,
+                                                        gt_video[:, i]==0))
+                    act_count += np.sum(np.logical_and(gt_video[:, i]==pred,
+                                                        gt_video[:, i]==1))
+                    total_count += len(pred)
+                    bkg_total_count += np.sum(gt_video[:, i]==0)
+            iou_[j] = bingo_count/total_count
+            if bkg_total_count == 0:
+                bkg_iou_[j] = 1
+            else:
+                bkg_iou_[j] = bkg_count/bkg_total_count
+            act_iou_[j] = act_count/(total_count-bkg_total_count)
+        test_iou += iou_
+        bkg_iou += bkg_iou_
+        act_iou += act_iou_
+
+    test_iou = test_iou/len(pred_dict)
+    bkg_iou = bkg_iou/len(pred_dict)
+    act_iou = act_iou/len(pred_dict)
+    
+    return test_iou, bkg_iou, act_iou

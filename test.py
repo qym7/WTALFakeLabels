@@ -20,7 +20,8 @@ def test(net, config, logger, test_loader, test_info, step, gt,
         if model_file is not None:
             net.load_state_dict(torch.load(model_file))
 
-        pred_dict = {}
+        wtal_pred_dict = {}
+        sup_pred_dict = {}
         savefig_path = os.path.join(config.output_path, 'casplot')
         savefig_path = os.path.abspath(savefig_path)
         if not os.path.exists(savefig_path):
@@ -135,18 +136,19 @@ def test(net, config, logger, test_loader, test_info, step, gt,
             final_res['results'][vid_name[0]] = utils.result2json(final_proposals)
 
             # Newly added mIoU operations
+            # For WTAL head
+            gt_ = gt[vid_name[0]]
+            cas_ = utils.get_cas(gt_, cas)
+            wtal_pred_dict[vid_name[0]] = cas_
+            if save:
+                plot_pred(cas_, gt_, vid_name[0]+'_wtal_', savefig_path)
+            # For Supervision head
             if sup_cas_softmax is not None:
                 cas = sup_cas_softmax
-            gt_ = gt[vid_name[0]]
-            if gt_.shape[0] > 750:
-                samples = np.arange(gt_.shape[0]) * 750 / gt_.shape[0]
-                samples = np.floor(samples)
-                cas_ = cas[0][samples].cpu().numpy()
-            else:
-                cas_ = cas[0, :, :].cpu().numpy()
-            pred_dict[vid_name[0]] = cas_
-            if save:
-                plot_pred(cas_, gt_, vid_name[0], savefig_path)
+                cas_ = utils.get_cas(gt_, cas)
+                sup_pred_dict[vid_name[0]] = cas_
+                if save:
+                    plot_pred(cas_, gt_, vid_name[0]+'_sup_', savefig_path)
 
         test_acc = num_correct / num_total
 
@@ -166,37 +168,12 @@ def test(net, config, logger, test_loader, test_info, step, gt,
         mAP, average_mAP = anet_detection.evaluate()
 
         # mIoU
-        test_iou = np.zeros(len(cls_thres))
-        bkg_iou = np.zeros(len(cls_thres))
-        act_iou = np.zeros(len(cls_thres))
-        for video_name in pred_dict:
-            cas = pred_dict[video_name]
-            gt_video = gt[video_name]
-            iou_ = np.zeros(len(cls_thres))
-            bkg_iou_ = np.zeros(len(cls_thres))
-            act_iou_ = np.zeros(len(cls_thres))
-            for j, thres in enumerate(cls_thres):
-                bingo_count = 0
-                total_count = 0
-                for i in range(gt_video.shape[-1]):
-                    if sum(gt_video[:, i]) > 0:
-                        pred = cas[:, i] > thres
-                        bingo_count += np.sum(gt_video[:, i]==pred)
-                        bkg_count = np.sum(np.logical_and(gt_video[:, i]==pred,
-                                                          gt_video[:, i]==0))
-                        act_count = np.sum(np.logical_and(gt_video[:, i]==pred,
-                                                          gt_video[:, i]==1))
-                        total_count += len(pred)
-                iou_[j] = bingo_count/total_count
-                bkg_iou_[j] = bkg_count/total_count
-                act_iou_[j] = act_count/total_count
-            test_iou += iou_
-            bkg_iou += bkg_iou_
-            act_iou += act_iou_
-        test_iou = test_iou/len(pred_dict)
-        bkg_iou = bkg_iou/len(pred_dict)
-        act_iou = act_iou/len(pred_dict)
-
+        if config.test_head == 'sup' and config.supervision != 'weak':
+            test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, sup_pred_dict, cls_thres)
+        else:
+            test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, wtal_pred_dict, cls_thres)
+        
+        # Update logger
         logger.log_value('Test accuracy', test_acc, step)
         logger.log_value('Average mAP', average_mAP, step)
         for i in range(tIoU_thresh.shape[0]):
@@ -206,10 +183,7 @@ def test(net, config, logger, test_loader, test_info, step, gt,
         for i in range(cls_thres.shape[0]):
             logger.log_value('mIoU@{:.2f}'.format(cls_thres[i]), test_iou[i], step)
 
-        # for i in range(tIoU_thresh.shape[0]):
-        #     logger.log_value('Frame mAP@{:.1f}'.format(tIoU_thresh[i]), fmAP[i], step)
-        # logger.log_value('Frame Average mAP', average_fmAP, step)
-
+        # Update test info
         test_info['step'].append(step)
         test_info['test_acc'].append(test_acc)
         test_info['average_mAP'].append(average_mAP)
@@ -228,11 +202,11 @@ def test(net, config, logger, test_loader, test_info, step, gt,
         for i in range(cls_thres.shape[0]):
             test_info['act_mIoU@{:.2f}'.format(cls_thres[i])].append(act_iou[i])
 
-        # test_info['average_fmAP'].append(average_fmAP)
-        # for i in range(tIoU_thresh.shape[0]):
-        #     test_info['fmAP@{:.1f}'.format(tIoU_thresh[i])].append(fmAP[i])
-
         if save:
             file_to_write = open(os.path.join(config.output_path,
-                                              '{}_pred_25.pickle'.format(config.test_dataset)), 'wb')
-            pickle.dump(pred_dict, file_to_write)
+                                              '{}_wtal_pred_25.pickle'.format(config.test_dataset)), 'wb')
+            pickle.dump(wtal_pred_dict, file_to_write)
+            if sup_cas_softmax is not None:
+                file_to_write = open(os.path.join(config.output_path,
+                                              '{}_sup_pred_25.pickle'.format(config.test_dataset)), 'wb')
+                pickle.dump(sup_pred_dict, file_to_write)

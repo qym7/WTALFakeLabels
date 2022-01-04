@@ -50,7 +50,6 @@ if __name__ == "__main__":
             batch_size=config.batch_size,
             shuffle=True, num_workers=config.num_workers,
             worker_init_fn=worker_init_fn)
-
     test_loader = data.DataLoader(
         ThumosFeature(data_path=config.data_path, mode=config.test_dataset,
                         modal=config.modal, feature_fps=config.feature_fps,
@@ -78,7 +77,7 @@ if __name__ == "__main__":
     best_mIoU = best_bkg_mIoU = best_act_mIoU = -1
     best_thres = 0
 
-    criterion = UM_loss(config.alpha, config.beta, config.lmbd,
+    criterion = UM_loss(config.alpha, config.beta, config.lmbd, config.bkg_lmbd,
                         config.margin, config.thres)
 
     optimizer = torch.optim.Adam(net.parameters(), lr=config.lr[0],
@@ -110,45 +109,43 @@ if __name__ == "__main__":
             iou_idx = np.argmax(np.array(iou))
             best_mIoU = max(iou)
             best_thres = cls_thres[iou_idx]
-            best_bkg_mIoU = test_info['bkg_mIoU@{:.2f}'.format(best_thres)][0]
-            best_act_mIoU = test_info['act_mIoU@{:.2f}'.format(best_thres)][0]
+            best_bkg_mIoU = test_info['bkg_mIoU@{:.2f}'.format(best_thres)][-1]
+            best_act_mIoU = test_info['act_mIoU@{:.2f}'.format(best_thres)][-1]
 
-            utils.save_best_record_thumos(test_info,
-                os.path.join(config.output_path, "best_record_{}_seed_{}.txt".format(
-                    config.test_dataset,
-                    config.seed)),
-                    cls_thres=cls_thres,
-                    best_thres=best_thres)
+            # utils.save_best_record_thumos(test_info,
+            #     os.path.join(config.output_path, "best_mIoU_record_{}_seed_{}.txt".format(
+            #         config.test_dataset,
+            #         config.seed)),
+            #         cls_thres=cls_thres,
+            #         best_thres=best_thres)
 
-            torch.save(net.state_dict(), os.path.join(args.model_path, \
-                "model_seed_{}.pkl".format(config.seed)))
+            # torch.save(net.state_dict(), os.path.join(args.model_path, \
+            #     "model_seed_{}.pkl".format(config.seed)))
 
         logger.log_value('Best mIoU threshold', best_thres, step)
         logger.log_value('Best mIoU', best_mIoU, step)
+
+        # save model by mAP
+        if test_info["average_mAP"][-1] > best_mAP:
+            best_mAP = test_info["average_mAP"][-1]
+
+            utils.save_best_record_thumos(test_info, 
+                os.path.join(config.output_path, "best_mAP_record_{}_seed_{}.txt".format(
+                    config.test_dataset,
+                    config.seed)),
+                cls_thres=cls_thres)
+
+            torch.save(net.state_dict(), os.path.join(args.model_path, \
+                "model_seed_{}.pkl".format(config.seed)))
 
         print(config.model_path.split('/')[-1],
               '--Average mIoU ', round(test_info['average_mIoU'][-1], 4),
               '--Best mIoU ', round(best_mIoU, 4),
               '--Best mIoU Thres ', round(best_thres, 4),
               '--Bkg mIoU ', round(best_bkg_mIoU, 4),
-              '--Act mIoU ', round(best_act_mIoU, 4))
-        
-        # # save model by mAP
-        # if test_info["average_mAP"][-1] > best_mAP:
-        #     best_mAP = test_info["average_mAP"][-1]
-
-        #     utils.save_best_record_thumos(test_info, 
-        #         os.path.join(config.output_path, "best_record_{}_seed_{}.txt".format(
-        #             config.test_dataset,
-        #             config.seed)),
-        #         cls_thres=cls_thres)
-
-        #     torch.save(net.state_dict(), os.path.join(args.model_path, \
-        #         "model_seed_{}.pkl".format(config.seed)))
-
-        print(config.model_path.split('/')[-1],
-              'mAP', round(test_info["average_mAP"][-1], 4))
-            #   'mIoU', test_info["average_mIoU"][-1])
+              '--Act mIoU ', round(best_act_mIoU, 4),
+              '--Average mAP', round(test_info["average_mAP"][-1], 4),
+              '--Best mAP ', round(best_mAP, 4),)
 
     utils.save_best_record_thumos(test_info,
         os.path.join(config.output_path, "full_record_{}_seed_{}.txt".format(config.test_dataset,

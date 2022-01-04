@@ -56,7 +56,6 @@ class ThumosFeature(data.Dataset):
 
         self.sampling = sampling
 
-
     def __len__(self):
         return len(self.vid_list)
 

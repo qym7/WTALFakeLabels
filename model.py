@@ -83,7 +83,7 @@ class Model(nn.Module):
         cas, features, sup_cas = self.cas_module(x)
         sup_cas_softmax = None
         if self.self_train:
-            sup_cas_softmax = self.softmax_2(sup_cas+0.01)
+            sup_cas_softmax = self.softmax_2(sup_cas)
 
         feat_magnitudes = torch.norm(features, p=2, dim=2)
 
