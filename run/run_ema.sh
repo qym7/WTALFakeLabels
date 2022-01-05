@@ -11,4 +11,4 @@ test_dataset='val'
 m='0.9'
 gamma='100'
 
-python -W ignore ./../main_ema.py --model_path ${model_path} --output_path ${output_path} --log_path ${log_path} --seed ${seed} --data_path ${data_path} --supervision ${supervision} --supervision_path ${supervision_path} --thres ${thres} --lmbd ${lmbd} --test_dataset ${test_dataset} --m ${m} --gamma ${gamma}
+python -W ignore ./main_ema.py --model_path ${model_path} --output_path ${output_path} --log_path ${log_path} --seed ${seed} --data_path ${data_path} --supervision ${supervision} --supervision_path ${supervision_path} --thres ${thres} --lmbd ${lmbd} --test_dataset ${test_dataset} --m ${m} --gamma ${gamma}

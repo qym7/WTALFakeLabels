@@ -112,6 +112,7 @@ if __name__ == "__main__":
             best_bkg_mIoU = test_info['bkg_mIoU@{:.2f}'.format(best_thres)][-1]
             best_act_mIoU = test_info['act_mIoU@{:.2f}'.format(best_thres)][-1]
 
+            # print('save by IoU')
             # utils.save_best_record_thumos(test_info,
             #     os.path.join(config.output_path, "best_mIoU_record_{}_seed_{}.txt".format(
             #         config.test_dataset,
@@ -129,6 +130,7 @@ if __name__ == "__main__":
         if test_info["average_mAP"][-1] > best_mAP:
             best_mAP = test_info["average_mAP"][-1]
 
+            print('save by mAP')
             utils.save_best_record_thumos(test_info, 
                 os.path.join(config.output_path, "best_mAP_record_{}_seed_{}.txt".format(
                     config.test_dataset,

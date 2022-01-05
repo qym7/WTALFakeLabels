@@ -169,8 +169,10 @@ def test(net, config, logger, test_loader, test_info, step, gt,
 
         # mIoU
         if config.test_head == 'sup' and config.supervision != 'weak':
+            print('IoU on sup head')
             test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, sup_pred_dict, cls_thres)
         else:
+            print('IoU on wtal head')
             test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, wtal_pred_dict, cls_thres)
         
         # Update logger

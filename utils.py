@@ -187,9 +187,9 @@ def calculate_iou(gt, pred_dict, cls_thres):
                     pred = cas[:, i] > thres
                     bingo_count += np.sum(gt_video[:, i]==pred)
                     bkg_count += np.sum(np.logical_and(gt_video[:, i]==pred,
-                                                        gt_video[:, i]==0))
+                                                       gt_video[:, i]==0))
                     act_count += np.sum(np.logical_and(gt_video[:, i]==pred,
-                                                        gt_video[:, i]==1))
+                                                       gt_video[:, i]==1))
                     total_count += len(pred)
                     bkg_total_count += np.sum(gt_video[:, i]==0)
             iou_[j] = bingo_count/total_count
@@ -198,6 +198,7 @@ def calculate_iou(gt, pred_dict, cls_thres):
             else:
                 bkg_iou_[j] = bkg_count/bkg_total_count
             act_iou_[j] = act_count/(total_count-bkg_total_count)
+            assert(act_count+bkg_count == bingo_count)
         test_iou += iou_
         bkg_iou += bkg_iou_
         act_iou += act_iou_

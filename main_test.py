@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     config = Config(args)
     worker_init_fn = None
-
+    print(1)
     if config.seed >= 0:
         utils.set_seed(config.seed)
         worker_init_fn = np.random.seed(config.seed)
@@ -28,10 +28,11 @@ if __name__ == "__main__":
     if config.test_dataset == 'test':
         utils.save_config(config, os.path.join(config.output_path, "config.txt"))
 
-    net = Model(config.len_feature, config.num_classes, config.r_act, config.r_bkg,
-                False)
+    net = Model(config.len_feature, config.num_classes, 
+                config.r_act, config.r_bkg,
+                config.supervision!='weak')
     net = net.cuda()
-
+    print(2)
     test_loader = data.DataLoader(
         ThumosFeature(data_path=config.data_path, mode=config.test_dataset,
                         modal=config.modal, feature_fps=config.feature_fps,
@@ -49,8 +50,10 @@ if __name__ == "__main__":
                  "average_mAP": [],
                  "mAP@0.1": [], "mAP@0.2": [], "mAP@0.3": [], 
                  "mAP@0.4": [], "mAP@0.5": [], "mAP@0.6": [], "mAP@0.7": [],
-                 "average_mIoU": []}
+                 "average_mIoU": [], "average_bkg_mIoU": [], "average_act_mIoU": []}
     iou_info = {'mIoU@{:.2f}'.format(thres): [] for thres in cls_thres}
+    iou_info.update({'bkg_mIoU@{:.2f}'.format(thres): [] for thres in cls_thres})
+    iou_info.update({'act_mIoU@{:.2f}'.format(thres): [] for thres in cls_thres})
     test_info.update(iou_info)
 
     logger = Logger(config.log_path)
