@@ -74,22 +74,29 @@ def save_best_record_thumos(test_info, file_path, cls_thres, best_thres=None):
 
     tIoU_thresh = np.linspace(0.1, 0.7, 7)
     for i in range(len(tIoU_thresh)):
-        fo.write("mAP@{:.1f}: {:.4f}\n".format(tIoU_thresh[i], test_info["mAP@{:.1f}".format(tIoU_thresh[i])][-1]))
+        fo.write("mAP@{:.1f}: {:.4f}\n".format(tIoU_thresh[i],
+                                               test_info["mAP@{:.1f}".format(tIoU_thresh[i])][-1]))
 
     # cls_thres = np.arange(0.1, 1, 0.1)
     fo.write("average_mIoU: {:.4f}\n".format(test_info["average_mIoU"][-1]))
     if best_thres is not None:
-        fo.write("best_thres: {:.2f}\n".format(best_thres))
+        fo.write("best_thres: {:.2f}_{:.2f}\n".format(best_thres[0], best_thres[1]))
     for i in range(len(cls_thres)):
-        fo.write("mIoU@{:.2f}: {:.4f}\n".format(cls_thres[i], test_info["mIoU@{:.2f}".format(cls_thres[i])][-1]))
+        fo.write("mIoU@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i][0],
+                                                       cls_thres[i][1],
+                                                       test_info['mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])][-1]))
 
     fo.write("average_bkg_mIoU: {:.4f}\n".format(test_info["average_bkg_mIoU"][-1]))
     for i in range(len(cls_thres)):
-        fo.write("bkg_mIoU@{:.2f}: {:.4f}\n".format(cls_thres[i], test_info["bkg_mIoU@{:.2f}".format(cls_thres[i])][-1]))
+        fo.write("bkg_mIoU@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i][0],
+                                                           cls_thres[i][1],
+                                                           test_info['bkg_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])][-1]))
 
     fo.write("average_act_mIoU: {:.4f}\n".format(test_info["average_act_mIoU"][-1]))
     for i in range(len(cls_thres)):
-        fo.write("act_mIoU@{:.2f}: {:.4f}\n".format(cls_thres[i], test_info["act_mIoU@{:.2f}".format(cls_thres[i])][-1]))
+        fo.write("act_mIoU@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i][0],
+                                                           cls_thres[i][1],
+                                                           test_info['act_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])][-1]))
     
     fo.close()
 
@@ -166,12 +173,13 @@ def get_cas(gt, cas):
         cas_ = cas[0, :, :].cpu().numpy()
     return cas_
 
-def calculate_iou(gt, pred_dict, cls_thres):
+def calculate_iou(gt, sup_pred_dict, wtal_pred_dict, cls_thres):
     test_iou = np.zeros(len(cls_thres))
     bkg_iou = np.zeros(len(cls_thres))
     act_iou = np.zeros(len(cls_thres))
-    for video_name in pred_dict:
-        cas = pred_dict[video_name]
+    for video_name in sup_pred_dict:
+        sup_cas = sup_pred_dict[video_name]
+        wtal_cas = wtal_pred_dict[video_name]
         gt_video = gt[video_name]
         iou_ = np.zeros(len(cls_thres))
         bkg_iou_ = np.zeros(len(cls_thres))
@@ -184,7 +192,9 @@ def calculate_iou(gt, pred_dict, cls_thres):
             bkg_total_count = 0
             for i in range(gt_video.shape[-1]):
                 if sum(gt_video[:, i]) > 0:
-                    pred = cas[:, i] > thres
+                    sup_pred = sup_cas[:, i] > thres[0]
+                    wtal_pred = wtal_cas[:, i] > thres[1]
+                    pred = np.logical_and(sup_pred, wtal_pred)
                     bingo_count += np.sum(gt_video[:, i]==pred)
                     bkg_count += np.sum(np.logical_and(gt_video[:, i]==pred,
                                                        gt_video[:, i]==0))
@@ -203,8 +213,8 @@ def calculate_iou(gt, pred_dict, cls_thres):
         bkg_iou += bkg_iou_
         act_iou += act_iou_
 
-    test_iou = test_iou/len(pred_dict)
-    bkg_iou = bkg_iou/len(pred_dict)
-    act_iou = act_iou/len(pred_dict)
+    test_iou = test_iou/len(sup_pred_dict)
+    bkg_iou = bkg_iou/len(sup_pred_dict)
+    act_iou = act_iou/len(sup_pred_dict)
     
     return test_iou, bkg_iou, act_iou

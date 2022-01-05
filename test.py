@@ -168,12 +168,15 @@ def test(net, config, logger, test_loader, test_info, step, gt,
         mAP, average_mAP = anet_detection.evaluate()
 
         # mIoU
-        if config.test_head == 'sup' and config.supervision != 'weak':
-            print('IoU on sup head')
-            test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, sup_pred_dict, cls_thres)
-        else:
-            print('IoU on wtal head')
-            test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, wtal_pred_dict, cls_thres)
+        # if config.test_head == 'sup' and config.supervision != 'weak':
+        #     print('IoU on sup head')
+        #     test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, sup_pred_dict, cls_thres)
+        # elif config.test_head == 'double' and config.supervision != 'weak':
+        print('IoU on double head')
+        test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, sup_pred_dict, wtal_pred_dict, cls_thres)
+        # else:
+        #     print('IoU on wtal head')
+        #     test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, wtal_pred_dict, cls_thres)
         
         # Update logger
         logger.log_value('Test accuracy', test_acc, step)
@@ -182,8 +185,8 @@ def test(net, config, logger, test_loader, test_info, step, gt,
             logger.log_value('mAP@{:.1f}'.format(tIoU_thresh[i]), mAP[i], step)
 
         logger.log_value('Average mIoU', test_iou.mean(), step)
-        for i in range(cls_thres.shape[0]):
-            logger.log_value('mIoU@{:.2f}'.format(cls_thres[i]), test_iou[i], step)
+        for i in range(len(cls_thres)):
+            logger.log_value('mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
 
         # Update test info
         test_info['step'].append(step)
@@ -193,16 +196,16 @@ def test(net, config, logger, test_loader, test_info, step, gt,
             test_info['mAP@{:.1f}'.format(tIoU_thresh[i])].append(mAP[i])
 
         test_info['average_mIoU'].append(test_iou.mean())
-        for i in range(cls_thres.shape[0]):
-            test_info['mIoU@{:.2f}'.format(cls_thres[i])].append(test_iou[i])
+        for i in range(len(cls_thres)):
+            test_info['mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(test_iou[i])
 
         test_info['average_bkg_mIoU'].append(test_iou.mean())
-        for i in range(cls_thres.shape[0]):
-            test_info['bkg_mIoU@{:.2f}'.format(cls_thres[i])].append(bkg_iou[i])
+        for i in range(len(cls_thres)):
+            test_info['bkg_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(bkg_iou[i])
 
         test_info['average_act_mIoU'].append(test_iou.mean())
-        for i in range(cls_thres.shape[0]):
-            test_info['act_mIoU@{:.2f}'.format(cls_thres[i])].append(act_iou[i])
+        for i in range(len(cls_thres)):
+            test_info['act_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(act_iou[i])
 
         if save:
             file_to_write = open(os.path.join(config.output_path,
