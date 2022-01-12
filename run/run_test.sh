@@ -1,7 +1,7 @@
-output_path='./outputs/UM-val-self-mAP-5-BCE-5'
-log_path='./logs/UM-val-self-mAP-5-BCE-5'
-model_path='./models/UM-val-self-mAP-5-BCE-5'
-model_file='./models/UM-val-self-mAP-5-BCE-5/model_seed_0.pkl'
+output_path='./outputs/UM-val-self-mAP-01-BCE'
+log_path='./logs/UM-val-self-mAP-01-BCE'
+model_path='./models/UM-val-self-mAP-01-BCE'
+model_file='./models/UM-val-self-mAP-01-BCE/model_seed_0.pkl'
 data_path="/DATA7_DB7/data/cju/20/BaSNet/dataset/THUMOS14"
 test_dataset='val'
 supervision='self'

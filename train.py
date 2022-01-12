@@ -41,15 +41,15 @@ class UM_loss(nn.Module):
         for i in range(cas.shape[0]):
             for j in range(cas.shape[-1]):
                 if gt_class[i, j] > 0:
-                    # _loss = self.BCE(gt[i, :, j], cas[i, :, j])
-                    _loss = torch.norm(cas[i, :, j] - gt[i, :, j], p=2)
+                    _loss = self.BCE(gt[i, :, j], cas[i, :, j])
+                    # _loss = torch.norm(cas[i, :, j] - gt[i, :, j], p=2)
                     act_loss = act_loss + torch.mean(_loss)
                     act_count += 1
                 else:
                     if self.bkg_lmbd > 0:
                         _gt = torch.zeros_like(cas[i, :, j]).cuda()
-                        # _loss = self.BCE(_gt, cas[i, :, j])
-                        _loss = torch.norm(cas[i, :, j] - _gt, p=2)
+                        _loss = self.BCE(_gt, cas[i, :, j])
+                        # _loss = torch.norm(cas[i, :, j] - _gt, p=2)
                         bkg_loss = bkg_loss + torch.mean(_loss)
                     bkg_count += 1
         act_loss = act_loss / act_count
@@ -114,17 +114,6 @@ def train(net, loader_iter, optimizer, criterion, logger, step):
     optimizer.zero_grad()
 
     score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax = net(_data)
-
-    # cas = None
-    # if net.self_train:
-    #     feat_magnitudes_act = torch.mean(torch.norm(feat_act, dim=2), dim=1)
-    #     feat_magnitudes_bkg = torch.mean(torch.norm(feat_bkg, dim=2), dim=1)
-    #     feat_magnitudes = torch.norm(features, p=2, dim=2)
-    #     feat_magnitudes = utils.minmax_norm(feat_magnitudes,
-    #                                         max_val=feat_magnitudes_act,
-    #                                         min_val=feat_magnitudes_bkg)
-    #     feat_magnitudes = feat_magnitudes.repeat((cas_softmax.shape[-1], 1, 1)).permute(1, 2, 0)
-    #     cas = utils.minmax_norm(cas_softmax * feat_magnitudes)
 
     cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
                            _gt, sup_cas_softmax)

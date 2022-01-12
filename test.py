@@ -135,7 +135,7 @@ def test(net, config, logger, test_loader, test_info, step, gt,
 
             final_res['results'][vid_name[0]] = utils.result2json(final_proposals)
 
-            # Newly added mIoU operations
+            # Plot and create feature dict
             # For WTAL head
             gt_ = gt[vid_name[0]]
             cas_ = utils.get_cas(gt_, cas)

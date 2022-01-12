@@ -121,7 +121,7 @@ if __name__ == "__main__":
             #         best_thres=best_thres)
 
             # torch.save(net.state_dict(), os.path.join(args.model_path, \
-            #     "model_seed_{}.pkl".format(config.seed)))
+            #     "best_iou_model_seed_{}.pkl".format(config.seed)))
 
         logger.log_value('Best mIoU threshold', best_thres, step)
         logger.log_value('Best mIoU', best_mIoU, step)
@@ -138,7 +138,7 @@ if __name__ == "__main__":
                 cls_thres=cls_thres)
 
             torch.save(net.state_dict(), os.path.join(args.model_path, \
-                "model_seed_{}.pkl".format(config.seed)))
+                "best_map_model_seed_{}.pkl".format(config.seed)))
 
         print(config.model_path.split('/')[-1],
               '--Average mIoU ', round(test_info['average_mIoU'][-1], 4),
@@ -148,6 +148,10 @@ if __name__ == "__main__":
               '--Act mIoU ', round(best_act_mIoU, 4),
               '--Average mAP', round(test_info["average_mAP"][-1], 4),
               '--Best mAP ', round(best_mAP, 4),)
+        
+        if step % 100 == 0:
+            torch.save(net.state_dict(), os.path.join(args.model_path, \
+                "model_seed_{}.pkl".format(config.seed)))
 
     utils.save_best_record_thumos(test_info,
         os.path.join(config.output_path, "full_record_{}_seed_{}.txt".format(config.test_dataset,

@@ -37,7 +37,6 @@ class Config(object):
         self.act_thresh_magnitudes = np.arange(0.4, 0.625, 0.025)
         self.scale = 24
         self.gt_path = os.path.join(self.data_path, 'gt.json')
-        # self.f_gt_path = os.path.join(self.script_path, 'val_gt_25.pickle')
         self.model_file = args.model_file
         self.seed = args.seed
         self.feature_fps = 25
