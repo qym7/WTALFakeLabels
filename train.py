@@ -1,19 +1,22 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 
 import utils
 
 
 class UM_loss(nn.Module):
-    def __init__(self, alpha, beta, lmbd, bkg_lmbd, margin, thres):
+    def __init__(self, alpha, beta, lmbd, neg_lmbd, bkg_lmbd, margin, thres, thres_down):
         super(UM_loss, self).__init__()
         self.alpha = alpha
         self.beta = beta
         self.lmbd = lmbd
+        self.neg_lmbd = neg_lmbd
         self.bkg_lmbd = bkg_lmbd
         self.margin = margin
         self.thres = thres
+        self.thres_down = thres_down
         self.ce_criterion = nn.BCELoss()
 
     def BCE(self, gt, cas):
@@ -31,25 +34,54 @@ class UM_loss(nn.Module):
         _loss_0 = - coef_0 * (1.0 - gt) * torch.log(1.0 - cas + 0.00001)
         _loss = _loss_1 + _loss_0
         return _loss
+    
+    def bi_loss(self, gt: torch.Tensor, logits):
+        """
+        gt: (batch, time_frame, 20)
+        cas: (batch, time_frame, 20)
+        separate the loss for gt == 1 and gt == 0, calculate the mean for each.
+        """
+        logits_pos = logits[gt.bool()]
+        logits_neg = logits[~gt.bool()]
+        loss_pos = F.binary_cross_entropy(torch.sigmoid(logits_pos).float(),
+                                          gt[gt.bool()].float(), reduction='mean')
+        loss_neg = F.binary_cross_entropy(torch.sigmoid(logits_neg).float(),
+                                          gt[~gt.bool()].float(), reduction='mean')
 
-    def balanced_ce(self, gt, cas, gt_class):
+        return loss_pos + self.neg_lmbd * loss_neg
+
+    def balanced_ce(self, gt, cas, gt_class, loss_type='ce'):
+        '''
+        loss_type = 'bce', 'mse', 'ce'
+        '''
         act_loss = torch.tensor(0.).cuda()
         bkg_loss = torch.tensor(0.).cuda()
         act_count = 0
         bkg_count = 0
-        gt = (gt > self.thres).float().cuda() 
+        if self.thres_down < 0:
+            gt = (gt > self.thres).float().cuda()
+        else:
+            _gt = torch.ones_like(gt).cuda() * -1
+            _gt[gt > self.thres] = 1
+            _gt[gt < self.thres_down] = 0
+            cas = cas[_gt >= 0]
+            gt = _gt[_gt >= 0]
         for i in range(cas.shape[0]):
             for j in range(cas.shape[-1]):
                 if gt_class[i, j] > 0:
-                    _loss = self.BCE(gt[i, :, j], cas[i, :, j])
-                    # _loss = torch.norm(cas[i, :, j] - gt[i, :, j], p=2)
+                    if loss_type == 'bce':
+                        _loss = self.BCE(gt[i, :, j], cas[i, :, j])
+                    else:
+                        _loss = self.bi_loss(gt[i, :, j], cas[i, :, j])
                     act_loss = act_loss + torch.mean(_loss)
                     act_count += 1
                 else:
                     if self.bkg_lmbd > 0:
                         _gt = torch.zeros_like(cas[i, :, j]).cuda()
-                        _loss = self.BCE(_gt, cas[i, :, j])
-                        # _loss = torch.norm(cas[i, :, j] - _gt, p=2)
+                        if loss_type == 'bce':
+                            _loss = self.BCE(_gt, cas[i, :, j])
+                        else:
+                            _loss = self.bi_loss(_gt, cas[i, :, j])
                         bkg_loss = bkg_loss + torch.mean(_loss)
                     bkg_count += 1
         act_loss = act_loss / act_count

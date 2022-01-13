@@ -62,7 +62,7 @@ if __name__ == "__main__":
                  "mAP@0.1": [], "mAP@0.2": [], "mAP@0.3": [], 
                  "mAP@0.4": [], "mAP@0.5": [], "mAP@0.6": [], "mAP@0.7": [],
                  "average_mIoU": []}
-    iou_info = {'mIoU@{:.2f}'.format(thres): [] for thres in cls_thres}
+    iou_info = {'mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1]): [] for thres in cls_thres}
     test_info.update(iou_info)
     best_mAP = -1
     cls_thres = np.arange(0.1, 1, 0.1)
@@ -94,7 +94,7 @@ if __name__ == "__main__":
         test(net, config, logger, test_loader, test_info, step, gt,
              cls_thres=cls_thres, save=False)
 
-        iou = [test_info['mIoU@{:.2f}'.format(thres)][-1] for thres in cls_thres]
+        iou = [test_info['mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1])][-1] for thres in cls_thres]
 
         # # save model by mIoU
         # if max(iou) > best_mIoU:

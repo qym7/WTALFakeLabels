@@ -51,9 +51,9 @@ if __name__ == "__main__":
                  "mAP@0.1": [], "mAP@0.2": [], "mAP@0.3": [], 
                  "mAP@0.4": [], "mAP@0.5": [], "mAP@0.6": [], "mAP@0.7": [],
                  "average_mIoU": [], "average_bkg_mIoU": [], "average_act_mIoU": []}
-    iou_info = {'mIoU@{:.2f}'.format(thres): [] for thres in cls_thres}
-    iou_info.update({'bkg_mIoU@{:.2f}'.format(thres): [] for thres in cls_thres})
-    iou_info.update({'act_mIoU@{:.2f}'.format(thres): [] for thres in cls_thres})
+    iou_info = {'mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1]): [] for thres in cls_thres}
+    iou_info.update({'bkg_mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1]): [] for thres in cls_thres})
+    iou_info.update({'act_mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1]): [] for thres in cls_thres})
     test_info.update(iou_info)
 
     logger = Logger(config.log_path)

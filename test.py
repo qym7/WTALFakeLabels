@@ -2,13 +2,14 @@ import torch
 import torch.nn as nn
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
+
 import utils
 import os
 import json
 import pickle
 from eval.eval_detection import ANETdetection
 from eval_utils import plot_pred
-from tqdm import tqdm
 
 
 def test(net, config, logger, test_loader, test_info, step, gt,
@@ -174,7 +175,7 @@ def test(net, config, logger, test_loader, test_info, step, gt,
         else:
             print('IoU on wtal head')
             test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, wtal_pred_dict, cls_thres)
-        
+
         # Update logger
         logger.log_value('Test accuracy', test_acc, step)
         logger.log_value('Average mAP', average_mAP, step)
@@ -183,7 +184,16 @@ def test(net, config, logger, test_loader, test_info, step, gt,
 
         logger.log_value('Average mIoU', test_iou.mean(), step)
         for i in range(cls_thres.shape[0]):
-            logger.log_value('mIoU@{:.2f}'.format(cls_thres[i]), test_iou[i], step)
+            logger.log_value('mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
+            
+        logger.log_value('Average bkg mIoU', test_iou.mean(), step)
+        for i in range(cls_thres.shape[0]):
+            logger.log_value('bkg_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
+
+        logger.log_value('Average act mIoU', test_iou.mean(), step)
+        for i in range(cls_thres.shape[0]):
+            logger.log_value('act_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
+
 
         # Update test info
         test_info['step'].append(step)
@@ -194,15 +204,15 @@ def test(net, config, logger, test_loader, test_info, step, gt,
 
         test_info['average_mIoU'].append(test_iou.mean())
         for i in range(cls_thres.shape[0]):
-            test_info['mIoU@{:.2f}'.format(cls_thres[i])].append(test_iou[i])
+            test_info['mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(test_iou[i])
 
         test_info['average_bkg_mIoU'].append(test_iou.mean())
         for i in range(cls_thres.shape[0]):
-            test_info['bkg_mIoU@{:.2f}'.format(cls_thres[i])].append(bkg_iou[i])
+            test_info['bkg_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(bkg_iou[i])
 
         test_info['average_act_mIoU'].append(test_iou.mean())
         for i in range(cls_thres.shape[0]):
-            test_info['act_mIoU@{:.2f}'.format(cls_thres[i])].append(act_iou[i])
+            test_info['act_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(act_iou[i])
 
         if save:
             file_to_write = open(os.path.join(config.output_path,

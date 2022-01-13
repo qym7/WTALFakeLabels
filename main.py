@@ -62,23 +62,23 @@ if __name__ == "__main__":
     with open(os.path.join(ANNOT_PATH, '{}_gt_25.pickle'.format(config.test_dataset)), 'rb') as f:
         gt = pickle.load(f)
 
-    cls_thres = np.arange(0.1, 1, 0.1)
+    thres = np.arange(0.1, 1, 0.1)
+    cls_thres = [(t_l, t_h) for i, t_l in enumerate(thres) for t_h in thres[i:]]
     test_info = {"step": [], "test_acc": [],
                  "average_mAP": [],
-                 "mAP@0.1": [], "mAP@0.2": [], "mAP@0.3": [], 
+                 "mAP@0.1": [], "mAP@0.2": [], "mAP@0.3": [],
                  "mAP@0.4": [], "mAP@0.5": [], "mAP@0.6": [], "mAP@0.7": [],
                  "average_mIoU": [], "average_bkg_mIoU": [], "average_act_mIoU": []}
-    iou_info = {'mIoU@{:.2f}'.format(thres): [] for thres in cls_thres}
-    iou_info.update({'bkg_mIoU@{:.2f}'.format(thres): [] for thres in cls_thres})
-    iou_info.update({'act_mIoU@{:.2f}'.format(thres): [] for thres in cls_thres})
+    iou_info = {'mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1]): [] for thres in cls_thres}
+    iou_info.update({'bkg_mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1]): [] for thres in cls_thres})
+    iou_info.update({'act_mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1]): [] for thres in cls_thres})
     test_info.update(iou_info)
     best_mAP = -1
-    cls_thres = np.arange(0.1, 1, 0.1)
     best_mIoU = best_bkg_mIoU = best_act_mIoU = -1
     best_thres = 0
 
-    criterion = UM_loss(config.alpha, config.beta, config.lmbd, config.bkg_lmbd,
-                        config.margin, config.thres)
+    criterion = UM_loss(config.alpha, config.beta, config.lmbd, config.neg_lmbd,
+                        config.bkg_lmbd, config.margin, config.thres, config.thres_down)
 
     optimizer = torch.optim.Adam(net.parameters(), lr=config.lr[0],
         betas=(0.9, 0.999), weight_decay=0.0005)
@@ -102,26 +102,26 @@ if __name__ == "__main__":
         test(net, config, logger, test_loader, test_info, step, gt,
              cls_thres=cls_thres, save=False)
 
-        iou = [test_info['mIoU@{:.2f}'.format(thres)][-1] for thres in cls_thres]
+        iou = [test_info['mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1])][-1] for thres in cls_thres]
 
         # save model by mIoU
         if max(iou) > best_mIoU:
             iou_idx = np.argmax(np.array(iou))
             best_mIoU = max(iou)
             best_thres = cls_thres[iou_idx]
-            best_bkg_mIoU = test_info['bkg_mIoU@{:.2f}'.format(best_thres)][-1]
-            best_act_mIoU = test_info['act_mIoU@{:.2f}'.format(best_thres)][-1]
+            best_bkg_mIoU = test_info['bkg_mIoU@{:.2f}_{:.2f}'.format(best_thres[0], best_thres[1])][-1]
+            best_act_mIoU = test_info['act_mIoU@{:.2f}_{:.2f}'.format(best_thres[0], best_thres[1])][-1]
 
-            # print('save by IoU')
-            # utils.save_best_record_thumos(test_info,
-            #     os.path.join(config.output_path, "best_mIoU_record_{}_seed_{}.txt".format(
-            #         config.test_dataset,
-            #         config.seed)),
-            #         cls_thres=cls_thres,
-            #         best_thres=best_thres)
+            print('save by IoU')
+            utils.save_best_record_thumos(test_info,
+                os.path.join(config.output_path, "best_mIoU_record_{}_seed_{}.txt".format(
+                    config.test_dataset,
+                    config.seed)),
+                    cls_thres=cls_thres,
+                    best_thres=best_thres)
 
-            # torch.save(net.state_dict(), os.path.join(args.model_path, \
-            #     "best_iou_model_seed_{}.pkl".format(config.seed)))
+            torch.save(net.state_dict(), os.path.join(args.model_path, \
+                "best_iou_model_seed_{}.pkl".format(config.seed)))
 
         logger.log_value('Best mIoU threshold', best_thres, step)
         logger.log_value('Best mIoU', best_mIoU, step)

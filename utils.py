@@ -74,23 +74,27 @@ def save_best_record_thumos(test_info, file_path, cls_thres, best_thres=None):
 
     tIoU_thresh = np.linspace(0.1, 0.7, 7)
     for i in range(len(tIoU_thresh)):
-        fo.write("mAP@{:.1f}: {:.4f}\n".format(tIoU_thresh[i], test_info["mAP@{:.1f}".format(tIoU_thresh[i])][-1]))
+        fo.write("mAP@{:.1f}: {:.4f}\n".format(tIoU_thresh[i],
+                 test_info["mAP@{:.1f}".format(tIoU_thresh[i])][-1]))
 
     # cls_thres = np.arange(0.1, 1, 0.1)
     fo.write("average_mIoU: {:.4f}\n".format(test_info["average_mIoU"][-1]))
     if best_thres is not None:
-        fo.write("best_thres: {:.2f}\n".format(best_thres))
+        fo.write("best_thres: {:.2f}_{:.2f}\n".format(best_thres[0], best_thres[1]))
     for i in range(len(cls_thres)):
-        fo.write("mIoU@{:.2f}: {:.4f}\n".format(cls_thres[i], test_info["mIoU@{:.2f}".format(cls_thres[i])][-1]))
+        fo.write("mIoU@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i],
+                 test_info["mIoU@{:.2f}_{:.2f}".format(cls_thres[i][0], cls_thres[i][1])][-1]))
 
     fo.write("average_bkg_mIoU: {:.4f}\n".format(test_info["average_bkg_mIoU"][-1]))
     for i in range(len(cls_thres)):
-        fo.write("bkg_mIoU@{:.2f}: {:.4f}\n".format(cls_thres[i], test_info["bkg_mIoU@{:.2f}".format(cls_thres[i])][-1]))
+        fo.write("bkg_mIoU@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i],
+                 test_info["bkg_mIoU@{:.2f}_{:.2f}".format(cls_thres[i][0], cls_thres[i][1])][-1]))
 
     fo.write("average_act_mIoU: {:.4f}\n".format(test_info["average_act_mIoU"][-1]))
     for i in range(len(cls_thres)):
-        fo.write("act_mIoU@{:.2f}: {:.4f}\n".format(cls_thres[i], test_info["act_mIoU@{:.2f}".format(cls_thres[i])][-1]))
-    
+        fo.write("act_mIoU@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i],
+                 test_info["act_mIoU@{:.2f}_{:.2f}".format(cls_thres[i][0], cls_thres[i][1])][-1]))
+
     fo.close()
 
 
@@ -184,7 +188,14 @@ def calculate_iou(gt, pred_dict, cls_thres):
             bkg_total_count = 0
             for i in range(gt_video.shape[-1]):
                 if sum(gt_video[:, i]) > 0:
-                    pred = cas[:, i] > thres
+                    if len(thres) > 1:
+                        pred = np.ones_like(cas[:, i]) * -1
+                        pred[cas[:, i] > thres] = 1
+                        pred[cas[:, i] < thres] = 0
+                        pred = pred[pred>=0]
+                        gt_video = gt_video[pred>=0]
+                    else:
+                        pred = cas[:, i] > thres
                     bingo_count += np.sum(gt_video[:, i]==pred)
                     bkg_count += np.sum(np.logical_and(gt_video[:, i]==pred,
                                                        gt_video[:, i]==0))

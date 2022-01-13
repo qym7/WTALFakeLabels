@@ -47,7 +47,9 @@ class Config(object):
         self.supervision = args.supervision
         self.supervision_path = args.supervision_path
         self.thres = args.thres
+        self.thres_down = args.thres_down
         self.lmbd = args.lmbd
+        self.neg_lmbd = args.neg_lmbd
         self.bkg_lmbd = args.bkg_lmbd
         self.save = bool(args.save)
         self.m = args.m
