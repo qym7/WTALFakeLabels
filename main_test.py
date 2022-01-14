@@ -45,7 +45,8 @@ if __name__ == "__main__":
                            '{}_gt_25.pickle'.format(config.test_dataset)), 'rb') as f:
         gt = pickle.load(f)
 
-    cls_thres = np.arange(0.1, 1, 0.1)
+    thres = np.arange(0.1, 1, 0.1)
+    cls_thres = [(round(t_l, 2), round(t_h, 2)) for i, t_l in enumerate(thres) for t_h in thres[i:]]
     test_info = {"step": [], "test_acc": [],
                  "average_mAP": [],
                  "mAP@0.1": [], "mAP@0.2": [], "mAP@0.3": [], 

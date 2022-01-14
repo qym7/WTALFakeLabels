@@ -63,7 +63,8 @@ if __name__ == "__main__":
         gt = pickle.load(f)
 
     thres = np.arange(0.1, 1, 0.1)
-    cls_thres = [(t_l, t_h) for i, t_l in enumerate(thres) for t_h in thres[i:]]
+    # cls_thres = [(round(t_l, 2), round(t_h, 2)) for i, t_l in enumerate(thres) for t_h in thres[i:]]
+    cls_thres = [(round(i, 2), round(i, 2)) for i in thres]
     test_info = {"step": [], "test_acc": [],
                  "average_mAP": [],
                  "mAP@0.1": [], "mAP@0.2": [], "mAP@0.3": [],
@@ -75,7 +76,7 @@ if __name__ == "__main__":
     test_info.update(iou_info)
     best_mAP = -1
     best_mIoU = best_bkg_mIoU = best_act_mIoU = -1
-    best_thres = 0
+    best_thres = (0, 0)
 
     criterion = UM_loss(config.alpha, config.beta, config.lmbd, config.neg_lmbd,
                         config.bkg_lmbd, config.margin, config.thres, config.thres_down)
@@ -123,7 +124,8 @@ if __name__ == "__main__":
             torch.save(net.state_dict(), os.path.join(args.model_path, \
                 "best_iou_model_seed_{}.pkl".format(config.seed)))
 
-        logger.log_value('Best mIoU threshold', best_thres, step)
+        logger.log_value('Best mIoU low threshold', best_thres[0], step)
+        logger.log_value('Best mIoU high threshold', best_thres[1], step)
         logger.log_value('Best mIoU', best_mIoU, step)
 
         # save model by mAP
@@ -131,7 +133,7 @@ if __name__ == "__main__":
             best_mAP = test_info["average_mAP"][-1]
 
             print('save by mAP')
-            utils.save_best_record_thumos(test_info, 
+            utils.save_best_record_thumos(test_info,
                 os.path.join(config.output_path, "best_mAP_record_{}_seed_{}.txt".format(
                     config.test_dataset,
                     config.seed)),
@@ -143,7 +145,8 @@ if __name__ == "__main__":
         print(config.model_path.split('/')[-1],
               '--Average mIoU ', round(test_info['average_mIoU'][-1], 4),
               '--Best mIoU ', round(best_mIoU, 4),
-              '--Best mIoU Thres ', round(best_thres, 4),
+              '--Best mIoU low Thres ', round(best_thres[0], 4),
+              '--Best mIoU high Thres ', round(best_thres[1], 4),
               '--Bkg mIoU ', round(best_bkg_mIoU, 4),
               '--Act mIoU ', round(best_act_mIoU, 4),
               '--Average mAP', round(test_info["average_mAP"][-1], 4),

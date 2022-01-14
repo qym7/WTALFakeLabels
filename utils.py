@@ -82,17 +82,20 @@ def save_best_record_thumos(test_info, file_path, cls_thres, best_thres=None):
     if best_thres is not None:
         fo.write("best_thres: {:.2f}_{:.2f}\n".format(best_thres[0], best_thres[1]))
     for i in range(len(cls_thres)):
-        fo.write("mIoU@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i],
+        fo.write("mIoU@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i][0],
+                                                       cls_thres[i][1],
                  test_info["mIoU@{:.2f}_{:.2f}".format(cls_thres[i][0], cls_thres[i][1])][-1]))
 
     fo.write("average_bkg_mIoU: {:.4f}\n".format(test_info["average_bkg_mIoU"][-1]))
     for i in range(len(cls_thres)):
-        fo.write("bkg_mIoU@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i],
+        fo.write("bkg_mIoU@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i][0],
+                                                           cls_thres[i][1],
                  test_info["bkg_mIoU@{:.2f}_{:.2f}".format(cls_thres[i][0], cls_thres[i][1])][-1]))
 
     fo.write("average_act_mIoU: {:.4f}\n".format(test_info["average_act_mIoU"][-1]))
     for i in range(len(cls_thres)):
-        fo.write("act_mIoU@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i],
+        fo.write("act_mIoU@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i][0],
+                                                           cls_thres[i][1],
                  test_info["act_mIoU@{:.2f}_{:.2f}".format(cls_thres[i][0], cls_thres[i][1])][-1]))
 
     fo.close()
@@ -185,31 +188,40 @@ def calculate_iou(gt, pred_dict, cls_thres):
             total_count = 0
             bkg_count = 0
             act_count = 0
+            all_count = 0
             bkg_total_count = 0
             for i in range(gt_video.shape[-1]):
                 if sum(gt_video[:, i]) > 0:
-                    if len(thres) > 1:
-                        pred = np.ones_like(cas[:, i]) * -1
-                        pred[cas[:, i] > thres] = 1
-                        pred[cas[:, i] < thres] = 0
-                        pred = pred[pred>=0]
-                        gt_video = gt_video[pred>=0]
-                    else:
-                        pred = cas[:, i] > thres
-                    bingo_count += np.sum(gt_video[:, i]==pred)
-                    bkg_count += np.sum(np.logical_and(gt_video[:, i]==pred,
-                                                       gt_video[:, i]==0))
-                    act_count += np.sum(np.logical_and(gt_video[:, i]==pred,
-                                                       gt_video[:, i]==1))
+                    all_count += len(gt_video[:, i])
+                    gt_ = gt_video[:, i]
+                    
+                    pred = np.ones_like(cas[:, i]) * -1
+                    pred[cas[:, i] <= thres[0]] = 0
+                    pred[cas[:, i] > thres[1]] = 1
+                    gt_ = gt_video[:, i][pred >= 0]
+                    pred = pred[pred >= 0]
+                    
+                    bingo_count += np.sum(gt_==pred)
+                    bkg_count += np.sum(np.logical_and(gt_==pred,
+                                                       gt_==0))
+                    act_count += np.sum(np.logical_and(gt_==pred,
+                                                       gt_==1))
                     total_count += len(pred)
-                    bkg_total_count += np.sum(gt_video[:, i]==0)
+                    bkg_total_count += np.sum(gt_==0)
             iou_[j] = bingo_count/total_count
             if bkg_total_count == 0:
                 bkg_iou_[j] = 1
             else:
                 bkg_iou_[j] = bkg_count/bkg_total_count
-            act_iou_[j] = act_count/(total_count-bkg_total_count)
+            if total_count-bkg_total_count == 0:
+                act_iou_[j] = 0
+            else:
+                act_iou_[j] = act_count/(total_count-bkg_total_count)
             assert(act_count+bkg_count == bingo_count)
+            # print(thres, round(total_count/all_count, 4),
+            #       'iou', round(iou_[j], 4),
+            #       'bkg_iou', round(bkg_iou_[j], 4),
+            #       'act_iou', round(act_iou_[j], 4))
         test_iou += iou_
         bkg_iou += bkg_iou_
         act_iou += act_iou_
@@ -217,5 +229,5 @@ def calculate_iou(gt, pred_dict, cls_thres):
     test_iou = test_iou/len(pred_dict)
     bkg_iou = bkg_iou/len(pred_dict)
     act_iou = act_iou/len(pred_dict)
-    
+ 
     return test_iou, bkg_iou, act_iou
