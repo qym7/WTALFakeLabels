@@ -16,6 +16,7 @@ class CAS_Module(nn.Module):
             nn.Conv1d(in_channels=2048, out_channels=num_classes, kernel_size=1,
                       stride=1, padding=0, bias=False)
         )
+        # Dropout rate changing point, default 0.7
         self.drop_out = nn.Dropout(p=0.7)
         
         if self.self_train:
@@ -23,6 +24,7 @@ class CAS_Module(nn.Module):
                 nn.Conv1d(in_channels=2048, out_channels=num_classes, kernel_size=1,
                         stride=1, padding=0, bias=False)
             )
+            # Dropout rate changing point, default 0.7
             self.sup_drop_out = nn.Dropout(p=0.7)
             self.mlp = nn.Sequential(
                         nn.Linear(num_classes, num_classes),
@@ -33,7 +35,6 @@ class CAS_Module(nn.Module):
                         nn.Dropout(0.1),
                         nn.Linear(num_classes, num_classes)
             )
-            self.sup_drop_out = nn.Dropout(p=0.7)
 
     def forward(self, x):
         # x: (B, T, F)

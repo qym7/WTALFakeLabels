@@ -1,14 +1,23 @@
-model_path='./models/UM-EMA'
-output_path='./outputs/UM-EMA'
-log_path='./logs/UM-EMA'
+model_path='./models/UM-val-01-10-EMA-5-0-10-BCE-09'
+output_path='./outputs/UM-val-01-10-EMA-5-0-10-BCE-09'
+log_path='./logs/UM-val-01-10-EMA-5-0-10-BCE-09'
 seed=0
 data_path='/DATA7_DB7/data/cju/20/BaSNet/dataset/THUMOS14'
 supervision='self'
-supervision_path='/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/outputs/UM/val_pred_25.pickle'
+# CHANGE PATH!!!!!
+supervision_path='/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/outputs/UM-val/val_pred_25.pickle'
+# supervision_path='/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/dataset/thumos_annotations/val_gt_25.pickle'
 thres='0.2'
-lmbd='10'
+thres_down='-1'
+lmbd='5.'
+neg_lmbd='0.'
+bkg_lmbd='10.'
 test_dataset='val'
+test_head='sup'
+# Do not change ema
+ema='1'
 m='0.9'
-gamma='100'
+gamma_f='0.1'
+gamma_c='10.'
 
-python -W ignore ./main_ema.py --model_path ${model_path} --output_path ${output_path} --log_path ${log_path} --seed ${seed} --data_path ${data_path} --supervision ${supervision} --supervision_path ${supervision_path} --thres ${thres} --lmbd ${lmbd} --test_dataset ${test_dataset} --m ${m} --gamma ${gamma}
+CUDA_VISIBLE_DEVICES=7 python -W ignore ./main.py --model_path ${model_path} --output_path ${output_path} --log_path ${log_path} --seed ${seed} --data_path ${data_path} --supervision ${supervision} --supervision_path ${supervision_path} --thres ${thres} --thres_down ${thres_down} --lmbd ${lmbd} --neg_lmbd ${neg_lmbd} --bkg_lmbd ${bkg_lmbd} --test_dataset ${test_dataset} --test_head ${test_head}  --m ${m} --gamma_f ${gamma_f} --gamma_c ${gamma_c} --ema ${ema}

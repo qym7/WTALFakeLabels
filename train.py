@@ -2,12 +2,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+from collections import OrderedDict
 
 import utils
 
 
 class UM_loss(nn.Module):
-    def __init__(self, alpha, beta, lmbd, neg_lmbd, bkg_lmbd, margin, thres, thres_down):
+    def __init__(self, alpha, beta, lmbd, neg_lmbd, bkg_lmbd, margin, thres, thres_down,
+                 gamma_f, gamma_c):
         super(UM_loss, self).__init__()
         self.alpha = alpha
         self.beta = beta
@@ -17,6 +19,8 @@ class UM_loss(nn.Module):
         self.margin = margin
         self.thres = thres
         self.thres_down = thres_down
+        self.gamma_f = gamma_f
+        self.gamma_c = gamma_c
         self.ce_criterion = nn.BCELoss()
 
     def BCE(self, gt, cas):
@@ -55,7 +59,7 @@ class UM_loss(nn.Module):
             loss_neg = torch.tensor(0.).cuda()
         return loss_pos + self.neg_lmbd * loss_neg
 
-    def balanced_ce(self, gt, cas, gt_class, loss_type='ce'):
+    def balanced_ce(self, gt, cas, gt_class, loss_type='bce'):
         '''
         loss_type = 'bce', 'mse', 'ce'
         '''
@@ -78,6 +82,8 @@ class UM_loss(nn.Module):
                 if gt_class[i, j] > 0:
                     if loss_type == 'bce':
                         _loss = self.BCE(gt_, cas_)
+                    elif loss_type == 'mse':
+                        _loss = torch.norm(cas_ - gt_, p=2)
                     else:
                         _loss = self.bi_loss(gt_, cas_)
                     act_loss = act_loss + torch.mean(_loss)
@@ -87,6 +93,8 @@ class UM_loss(nn.Module):
                         _gt = torch.zeros_like(cas_).cuda()
                         if loss_type == 'bce':
                             _loss = self.BCE(_gt, cas_)
+                        elif loss_type == 'mse':
+                            _loss = torch.norm(cas_ - _gt, p=2)
                         else:
                             _loss = self.bi_loss(_gt, cas_)
                         bkg_loss = bkg_loss + torch.mean(_loss)
@@ -97,7 +105,7 @@ class UM_loss(nn.Module):
         return act_loss, bkg_loss
 
     def forward(self, score_act, score_bkg, feat_act, feat_bkg, label,
-                gt, cas):
+                gt, cas, score_act_t=None, cas_t=None):
         loss = {}
  
         label = label / torch.sum(label, dim=1, keepdim=True)
@@ -117,7 +125,7 @@ class UM_loss(nn.Module):
         loss_total = loss_cls + self.alpha * loss_um + self.beta * loss_be
 
         if cas is not None:
-            loss_sup_act, loss_sup_bkg = self.balanced_ce(gt, cas, label)
+            loss_sup_act, loss_sup_bkg = self.balanced_ce(gt, cas, label, 'bce')
             loss_sup_act = self.lmbd * loss_sup_act
             loss_sup_bkg = self.lmbd * self.bkg_lmbd * loss_sup_bkg
             loss_sup = loss_sup_act + loss_sup_bkg
@@ -128,6 +136,16 @@ class UM_loss(nn.Module):
             print("loss_sup_act", (loss_sup_act).detach().cpu().item())
             print("loss_sup_bkg", (loss_sup_bkg).detach().cpu().item())
             print("loss_sup", (loss_sup).detach().cpu().item())
+        
+        if cas_t is not None:
+            loss_sup_act, loss_sup_bkg = self.balanced_ce(gt, cas, label, 'mse')
+            loss_ema_f = self.gamma_f * (loss_sup_act + self.bkg_lmbd * loss_sup_bkg)
+            loss_ema_c = self.gamma_c * torch.norm(score_act - score_act_t, p=2).mean()
+            loss_total = loss_total + loss_ema_f + loss_ema_c
+            loss["loss_ema_f"] = loss_ema_f
+            loss["loss_ema_c"] = loss_ema_c
+            print("loss_ema_f", (loss_ema_f).detach().cpu().item())
+            print("loss_ema_c", (loss_ema_c).detach().cpu().item())
 
         loss["loss_cls"] = loss_cls
         loss["loss_be"] = loss_be
@@ -140,7 +158,7 @@ class UM_loss(nn.Module):
 
         return loss_total, loss
 
-def train(net, loader_iter, optimizer, criterion, logger, step):
+def train(net, loader_iter, optimizer, criterion, logger, step, net_teacher, m):
     net.train()
 
     _data, _label, _gt, _, _ = next(loader_iter)
@@ -154,11 +172,38 @@ def train(net, loader_iter, optimizer, criterion, logger, step):
 
     score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax = net(_data)
 
-    cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
-                           _gt, sup_cas_softmax)
+    if net_teacher is not None:
+        score_act_t, _, _, _, _, _, sup_cas_softmax_t = net_teacher(_data)
+        cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
+                               _gt, sup_cas_softmax, score_act_t, sup_cas_softmax_t)
+    else:
+        cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
+                               _gt, sup_cas_softmax)
 
     cost.backward()
     optimizer.step()
+
+    if net_teacher is not None:
+        # update teacher parameters by EMA
+        student_params = OrderedDict(net.named_parameters())
+        teacher_params = OrderedDict(net_teacher.named_parameters())
+
+        # check if both model contains the same set of keys
+        assert student_params.keys() == teacher_params.keys()
+
+        for name, param in student_params.items():
+            # see https://www.tensorflow.org/api_docs/python/tf/train/ExponentialMovingAverage
+            # shadow_variable -= (1 - decay) * (shadow_variable - variable)
+            teacher_params[name] = teacher_params[name] * m + (1 - m) * param
+
+        student_buffers = OrderedDict(net.named_buffers())
+        teacher_buffers = OrderedDict(net_teacher.named_buffers())
+
+        # check if both model contains the same set of keys
+        assert student_buffers.keys() == teacher_buffers.keys()
+
+        for name, buffer in student_buffers.items():
+            teacher_buffers[name] = teacher_buffers[name] * m + (1 - m) * buffer
 
     for key in loss.keys():
         logger.log_value(key, loss[key].cpu().item(), step)

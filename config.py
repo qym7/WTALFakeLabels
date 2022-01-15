@@ -52,8 +52,10 @@ class Config(object):
         self.neg_lmbd = args.neg_lmbd
         self.bkg_lmbd = args.bkg_lmbd
         self.save = bool(args.save)
+        self.ema = args.ema
         self.m = args.m
-        self.gamma = args.gamma
+        self.gamma_f = args.gamma_f
+        self.gamma_c = args.gamma_c
 
     def __str__(self):
         attrs = vars(self)

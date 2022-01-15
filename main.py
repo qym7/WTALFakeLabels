@@ -27,7 +27,7 @@ if __name__ == "__main__":
     print('current device: ', torch.cuda.current_device())
     free_gpu_id = int(utils.get_free_gpu())
     print('free gpu: ', free_gpu_id)
-    torch.cuda.set_device(free_gpu_id)
+    # torch.cuda.set_device(free_gpu_id)
     print('current device: ', torch.cuda.current_device())
 
     if config.seed >= 0:
@@ -40,6 +40,12 @@ if __name__ == "__main__":
                 config.r_act, config.r_bkg,
                 config.supervision!='weak')
     net = net.cuda()
+    net_teacher = None
+    if bool(config.ema):
+        net_teacher = Model(config.len_feature, config.num_classes, 
+                        config.r_act, config.r_bkg,
+                        config.supervision!='weak')
+        net_teacher = net_teacher.cuda()
 
     train_loader = data.DataLoader(
         ThumosFeature(data_path=config.data_path, mode='train',
@@ -79,7 +85,8 @@ if __name__ == "__main__":
     best_thres = (0, 0)
 
     criterion = UM_loss(config.alpha, config.beta, config.lmbd, config.neg_lmbd,
-                        config.bkg_lmbd, config.margin, config.thres, config.thres_down)
+                        config.bkg_lmbd, config.margin, config.thres, config.thres_down,
+                        config.gamma_f, config.gamma_c)
 
     optimizer = torch.optim.Adam(net.parameters(), lr=config.lr[0],
         betas=(0.9, 0.999), weight_decay=0.0005)
@@ -98,7 +105,8 @@ if __name__ == "__main__":
         if (step - 1) % len(train_loader) == 0:
             loader_iter = iter(train_loader)
 
-        train(net, loader_iter, optimizer, criterion, logger, step)
+        train(net, loader_iter, optimizer, criterion, logger, step,
+              net_teacher, config.m)
 
         test(net, config, logger, test_loader, test_info, step, gt,
              cls_thres=cls_thres, save=False)

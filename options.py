@@ -41,8 +41,10 @@ def parse_args():
     parser.add_argument('--neg_lmbd', default=0.1, type=float)
     parser.add_argument('--bkg_lmbd', default=1, type=float)
     parser.add_argument('--save', default=0, type=int)
+    parser.add_argument('--ema', default=0, type=int, help='int for if EMA or not')
     parser.add_argument('--m', default=0.9, type=float, help='decay params for EMA')
-    parser.add_argument('--gamma', default=1.0, type=float, help='loss weight for EMA')
+    parser.add_argument('--gamma_f', default=1.0, type=float, help='loss weight for EMA on frame level')
+    parser.add_argument('--gamma_c', default=1.0, type=float, help='loss weight for EMA on video class level')
 
     return init_args(parser.parse_args())
 

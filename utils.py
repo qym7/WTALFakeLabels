@@ -202,6 +202,7 @@ def calculate_iou(gt, pred_dict, cls_thres):
                     pred = pred[pred >= 0]
                     
                     bingo_count += np.sum(gt_==pred)
+                    # recall (gt_) / precision (pred)
                     bkg_count += np.sum(np.logical_and(gt_==pred,
                                                        gt_==0))
                     act_count += np.sum(np.logical_and(gt_==pred,
