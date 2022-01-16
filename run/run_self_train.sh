@@ -1,6 +1,6 @@
-model_path='./models/UM-val-self-mAP-01-BCE-09-drop'
-output_path='./outputs/UM-val-self-mAP-01-BCE-09-drop'
-log_path='./logs/UM-val-self-mAP-01-BCE-09-drop'
+model_path='./models/UM-val-self-mAP-01-BCE-09-07-drop'
+output_path='./outputs/UM-val-self-mAP-01-BCE-09-07-drop'
+log_path='./logs/UM-val-self-mAP-01-BCE-09-07-drop'
 seed=0
 data_path='/DATA7_DB7/data/cju/20/BaSNet/dataset/THUMOS14'
 supervision='self'

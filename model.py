@@ -25,7 +25,7 @@ class CAS_Module(nn.Module):
                         stride=1, padding=0, bias=False)
             )
             # Dropout rate changing point, default 0.7
-            self.sup_drop_out = nn.Dropout(p=0.7)
+            self.sup_drop_out = nn.Dropout(p=0.9)
             self.mlp = nn.Sequential(
                         nn.Linear(num_classes, num_classes),
                         nn.ReLU(),
