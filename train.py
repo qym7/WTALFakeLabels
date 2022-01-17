@@ -1,3 +1,4 @@
+from tokenize import Exponent
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -105,7 +106,7 @@ class UM_loss(nn.Module):
         return act_loss, bkg_loss
 
     def forward(self, score_act, score_bkg, feat_act, feat_bkg, label,
-                gt, cas, score_act_t=None, score_bkg_t=None, cas_t=None):
+                gt, cas, score_act_t=None, score_bkg_t=None, cas_t=None, step=0):
         loss = {}
  
         label = label / torch.sum(label, dim=1, keepdim=True)
@@ -129,7 +130,7 @@ class UM_loss(nn.Module):
             loss_sup_act = self.lmbd * loss_sup_act
             loss_sup_bkg = self.lmbd * self.bkg_lmbd * loss_sup_bkg
             loss_sup = loss_sup_act + loss_sup_bkg
-            loss_total = loss_total + loss_sup
+            loss_total = loss_total + loss_sup * torch.pow(input=torch.tensor(0.98), exponent=step/50)
             loss["loss_sup_act"] = loss_sup_act
             loss["loss_sup_bkg"] = loss_sup_bkg
             loss["loss_sup"] = loss_sup_bkg
@@ -176,7 +177,7 @@ def train(net, loader_iter, optimizer, criterion, logger, step, net_teacher, m):
     if net_teacher is not None:
         score_act_t, score_bkg_t, _, _, _, _, sup_cas_softmax_t = net_teacher(_data)
         cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
-                               _gt, sup_cas_softmax, score_act_t, score_bkg_t, sup_cas_softmax_t)
+                               _gt, sup_cas_softmax, score_act_t, score_bkg_t, sup_cas_softmax_t, step)
     else:
         cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
                                _gt, sup_cas_softmax)
