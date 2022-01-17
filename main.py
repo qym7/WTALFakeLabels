@@ -108,8 +108,12 @@ if __name__ == "__main__":
         train(net, loader_iter, optimizer, criterion, logger, step,
               net_teacher, config.m)
 
-        test(net, config, logger, test_loader, test_info, step, gt,
-             cls_thres=cls_thres, save=False)
+        sup_pred_dict = test(net, config, logger, test_loader, test_info, step, gt,
+                        cls_thres=cls_thres, save=False)
+
+        # update pseudo-labels
+        if step % 1000 == 0:
+            train_loader.temp_annots = sup_pred_dict
 
         iou = [test_info['mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1])][-1] for thres in cls_thres]
 
@@ -152,6 +156,7 @@ if __name__ == "__main__":
 
         print(config.model_path.split('/')[-1],
               '--Average mIoU ', round(test_info['average_mIoU'][-1], 4),
+              '--Cur mIoU ', np.mean(np.array(iou)),
               '--Best mIoU ', round(best_mIoU, 4),
               '--Best mIoU low Thres ', round(best_thres[0], 4),
               '--Best mIoU high Thres ', round(best_thres[1], 4),
