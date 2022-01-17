@@ -156,7 +156,7 @@ if __name__ == "__main__":
 
         print(config.model_path.split('/')[-1],
               '--Average mIoU ', round(test_info['average_mIoU'][-1], 4),
-              '--Cur mIoU ', np.mean(np.array(iou)),
+              '--Cur mIoU ', max(iou),
               '--Best mIoU ', round(best_mIoU, 4),
               '--Best mIoU low Thres ', round(best_thres[0], 4),
               '--Best mIoU high Thres ', round(best_thres[1], 4),
