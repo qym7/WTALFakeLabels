@@ -25,14 +25,14 @@ class CAS_Module(nn.Module):
                         stride=1, padding=0, bias=False)
             )
             # Dropout rate changing point, default 0.7
-            self.sup_drop_out = nn.Dropout(p=0.9)
+            self.sup_drop_out = nn.Dropout(p=0.7)
             self.mlp = nn.Sequential(
                         nn.Linear(num_classes, num_classes),
                         nn.ReLU(),
-                        nn.Dropout(0.1),
+                        # nn.Dropout(0.9),
                         nn.Linear(num_classes, num_classes),
                         nn.ReLU(),
-                        nn.Dropout(0.1),
+                        # nn.Dropout(0.9),
                         nn.Linear(num_classes, num_classes)
             )
 
@@ -51,7 +51,7 @@ class CAS_Module(nn.Module):
             sup_out = self.sup_drop_out(features.permute(0, 2, 1))
             sup_out = self.sup_classifier(sup_out)
             sup_out = sup_out.permute(0, 2, 1)
-            # sup_out = self.mlp(sup_out)
+            sup_out = self.mlp(sup_out)
             # sup_out = self.mlp(out)
             return out, features, sup_out
         return out, features, sup_out
