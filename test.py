@@ -188,11 +188,11 @@ def test(net, config, logger, test_loader, test_info, step, gt,
             
         logger.log_value('Average bkg mIoU', test_iou.mean(), step)
         for i in range(len(cls_thres)):
-            logger.log_value('bkg_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
+            logger.log_value('bkg_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), bkg_iou[i], step)
 
         logger.log_value('Average act mIoU', test_iou.mean(), step)
         for i in range(len(cls_thres)):
-            logger.log_value('act_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
+            logger.log_value('act_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), act_iou[i], step)
 
 
         # Update test info

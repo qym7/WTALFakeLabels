@@ -51,7 +51,7 @@ class CAS_Module(nn.Module):
             sup_out = self.sup_drop_out(features.permute(0, 2, 1))
             sup_out = self.sup_classifier(sup_out)
             sup_out = sup_out.permute(0, 2, 1)
-            # sup_out = self.mlp(sup_out)
+            sup_out = self.mlp(sup_out)
             # sup_out = self.mlp(out)
             return out, features, sup_out
         return out, features, sup_out

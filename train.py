@@ -130,7 +130,8 @@ class UM_loss(nn.Module):
             loss_sup_act = self.lmbd * loss_sup_act
             loss_sup_bkg = self.lmbd * self.bkg_lmbd * loss_sup_bkg
             loss_sup = loss_sup_act + loss_sup_bkg
-            loss_total = loss_total + loss_sup * torch.pow(input=torch.tensor(0.98), exponent=step/50)
+            # loss_total = loss_total + loss_sup * torch.pow(input=torch.tensor(0.98), exponent=step/50)
+            loss_total = loss_total + loss_sup
             loss["loss_sup_act"] = loss_sup_act
             loss["loss_sup_bkg"] = loss_sup_bkg
             loss["loss_sup"] = loss_sup_bkg
