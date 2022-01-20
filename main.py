@@ -83,6 +83,7 @@ if __name__ == "__main__":
     best_mAP = -1
     best_mIoU = best_bkg_mIoU = best_act_mIoU = -1
     best_thres = (0, 0)
+    cur_gt_iou = 0
 
     criterion = UM_loss(config.alpha, config.beta, config.lmbd, config.neg_lmbd,
                         config.bkg_lmbd, config.margin, config.thres, config.thres_down,
@@ -111,11 +112,25 @@ if __name__ == "__main__":
         sup_pred_dict = test(net, config, logger, test_loader, test_info, step, gt,
                         cls_thres=cls_thres, save=False)
 
+        iou = [test_info['mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1])][-1] for thres in cls_thres]
+
         # update pseudo-labels
         if step % 1000 == 0:
             train_loader.temp_annots = sup_pred_dict
+            cur_gt_iou = test_info['mIoU@0.20_0.20'][-1]
+            net = Model(config.len_feature, config.num_classes, 
+                        config.r_act, config.r_bkg,
+                        config.supervision!='weak')
+            net = net.cuda()
+            net_teacher = None
+            if bool(config.ema):
+                net_teacher = Model(config.len_feature, config.num_classes, 
+                                config.r_act, config.r_bkg,
+                                config.supervision!='weak')
+                net_teacher = net_teacher.cuda()
 
-        iou = [test_info['mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1])][-1] for thres in cls_thres]
+            optimizer = torch.optim.Adam(net.parameters(), lr=config.lr[0],
+                                         betas=(0.9, 0.999), weight_decay=0.0005)
 
         # save model by mIoU
         if max(iou) > best_mIoU:
@@ -157,6 +172,7 @@ if __name__ == "__main__":
         print(config.model_path.split('/')[-1],
               '--Average mIoU ', round(test_info['average_mIoU'][-1], 4),
               '--Cur mIoU ', round(max(iou), 4),
+              '--Cur gt mIoU ', round(cur_gt_iou, 4),
               '--Best mIoU ', round(best_mIoU, 4),
               '--Best mIoU low Thres ', round(best_thres[0], 4),
               '--Best mIoU high Thres ', round(best_thres[1], 4),

@@ -105,7 +105,7 @@ class UM_loss(nn.Module):
         return act_loss, bkg_loss
 
     def forward(self, score_act, score_bkg, feat_act, feat_bkg, label,
-                gt, cas, score_act_t=None, cas_t=None):
+                gt, cas, score_act_t=None, score_bkg_t=None, cas_t=None, step=0):
         loss = {}
  
         label = label / torch.sum(label, dim=1, keepdim=True)
@@ -129,6 +129,7 @@ class UM_loss(nn.Module):
             loss_sup_act = self.lmbd * loss_sup_act
             loss_sup_bkg = self.lmbd * self.bkg_lmbd * loss_sup_bkg
             loss_sup = loss_sup_act + loss_sup_bkg
+            # loss_total = loss_total + loss_sup * torch.pow(input=torch.tensor(0.98), exponent=step/50)
             loss_total = loss_total + loss_sup
             loss["loss_sup_act"] = loss_sup_act
             loss["loss_sup_bkg"] = loss_sup_bkg
@@ -138,9 +139,9 @@ class UM_loss(nn.Module):
             print("loss_sup", (loss_sup).detach().cpu().item())
         
         if cas_t is not None:
-            loss_sup_act, loss_sup_bkg = self.balanced_ce(gt, cas, label, 'mse')
-            loss_ema_f = self.gamma_f * (loss_sup_act + self.bkg_lmbd * loss_sup_bkg)
-            loss_ema_c = self.gamma_c * torch.norm(score_act - score_act_t, p=2).mean()
+            loss_ema_f = self.gamma_f * torch.norm(cas - cas_t, p=2).mean()
+            loss_ema_c = self.gamma_c * torch.norm(score_act - score_act_t, p=2).mean() +\
+                self.gamma_c * torch.norm(score_bkg - score_bkg_t, p=2).mean()
             loss_total = loss_total + loss_ema_f + loss_ema_c
             loss["loss_ema_f"] = loss_ema_f
             loss["loss_ema_c"] = loss_ema_c
@@ -173,12 +174,12 @@ def train(net, loader_iter, optimizer, criterion, logger, step, net_teacher, m):
     score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax = net(_data)
 
     if net_teacher is not None:
-        score_act_t, _, _, _, _, _, sup_cas_softmax_t = net_teacher(_data)
+        score_act_t, score_bkg_t, _, _, _, _, sup_cas_softmax_t = net_teacher(_data)
         cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
-                               _gt, sup_cas_softmax, score_act_t, sup_cas_softmax_t)
+                               _gt, sup_cas_softmax, score_act_t, score_bkg_t, sup_cas_softmax_t, step=step)
     else:
         cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
-                               _gt, sup_cas_softmax)
+                               _gt, sup_cas_softmax, step=step)
 
     cost.backward()
     optimizer.step()
