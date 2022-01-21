@@ -99,10 +99,34 @@ class UM_loss(nn.Module):
         # bkg_loss = bkg_loss / (~gt_channel_pos).sum()
 
         return act_loss, bkg_loss
+    
+    def contrastive_loss(self, node, label, pos_nodes, neg_nodes):
+        pos_sim = torch.norm(pos_nodes - node, p=2, dim=1)
+        neg_sim = torch.norm(neg_nodes - node, p=2, dim=1)
+        pos_sample = pos_nodes[torch.argmax(pos_sim)]
+        neg_sample = neg_nodes[torch.argmin(neg_sim)]
+        
+        return F.cosine_similarity(node, pos_sample) + F.cosine_similarity(node, neg_sample)
+    
+    def gcn_loss(self, nodes, nodes_label):
+        n_sample = 8 # sample number for every class
+        loss = torch.tensor(0)
+        for i in enumerate(len(nodes)):
+            node = nodes[i]
+            node_label = nodes_label[i]  # N * 2048
+            pos_node = node[node_label==1]
+            neg_node = node[node_label==0]
+            for i in range(n_sample):
+                idx = torch.random.choice(torch.where(node_label!=-1))
+                if node_label[idx] == 0:
+                    loss += self.contrastive_loss(node[idx], node_label[idx], neg_node, pos_node)
+                else:
+                    loss += self.contrastive_loss(node[idx], node_label[idx], pos_node, neg_node)
 
-
+            
     def forward(self, score_act, score_bkg, feat_act, feat_bkg, label,
-                gt, cas, score_act_t=None, score_bkg_t=None, cas_t=None, step=0):
+                gt, cas, score_act_t=None, score_bkg_t=None, cas_t=None, 
+                nodes=None, nodes_label=None, step=0):
         loss = {}
  
         label = label / torch.sum(label, dim=1, keepdim=True)
@@ -120,6 +144,11 @@ class UM_loss(nn.Module):
         loss_um = torch.mean((loss_act + loss_bkg) ** 2)
 
         loss_total = loss_cls + self.alpha * loss_um + self.beta * loss_be
+
+        if nodes is not None:
+            loss_gcn = self.gcn_loss(nodes, nodes_label)
+            loss["loss_gcn"] = loss_gcn
+            print("loss_gcn", (loss_gcn).detach().cpu().item())
 
         if cas is not None:
             loss_sup_act, loss_sup_bkg = self.balanced_ce(gt, cas, 'bce')
@@ -162,21 +191,25 @@ def train(net, loader_iter, optimizer, criterion, logger, step, net_teacher, m):
     _data, _label, _gt, _, _ = next(loader_iter)
 
     _data = _data.cuda()
-    _label = _label.cuda()
+    _gt = _data.reshape(-1, _gt.shape[-2], _gt.shape[-1]).cuda()
+    _label = _label.reshape(-1, _data.shape[-1]).cuda()
     if _gt is not None:
         _gt = _gt.cuda()
 
     optimizer.zero_grad()
 
-    score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax = net(_data)
+    score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax, nodes, nodes_label = net(_data, _gt)
 
     if net_teacher is not None:
-        score_act_t, score_bkg_t, _, _, _, _, sup_cas_softmax_t = net_teacher(_data)
+        score_act_t, score_bkg_t, _, _, _, _, sup_cas_softmax_t, nodes_t, nodes_label_t = net_teacher(_data)
         cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
-                               _gt, sup_cas_softmax, score_act_t, score_bkg_t, sup_cas_softmax_t, step=step)
+                               _gt, sup_cas_softmax, score_act_t, score_bkg_t, sup_cas_softmax_t, 
+                               nodes_t, nodes_label_t,
+                               step=step)
     else:
         cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
-                               _gt, sup_cas_softmax, step=step)
+                               _gt, sup_cas_softmax, nodes, nodes_label,
+                               step=step)
 
     cost.backward()
     optimizer.step()

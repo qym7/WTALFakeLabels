@@ -42,7 +42,9 @@ class ThumosFeature(data.Dataset):
         anno_file = open(anno_path, 'r')
         self.anno = json.load(anno_file)
         anno_file.close()
-
+        
+        self.all_labels, self.label_group = self.get_all_labels()
+        self.cls_group = self.group_all_labels()
         self.supervision = supervision
         if self.supervision != 'weak':
             if len(supervision_path) == 0:
@@ -57,12 +59,45 @@ class ThumosFeature(data.Dataset):
         self.sampling = sampling
 
     def __len__(self):
-        return len(self.vid_list)
+        return len(self.label_group)
 
     def __getitem__(self, index):
+        v_index = np.random.choice(self.label_group[index], 2)
+        data = []
+        label = []
+        vid_num_seg = []
+        temp_anno = []
+        vid_name = []
+        vid_num_seg = []
+        for idx in v_index:
+            data_, label_, temp_anno_, vid_name_, vid_num_seg_ = self.get_single_item(idx)
+            data.append(data_)
+            label.append(label_)
+            vid_num_seg.append(temp_anno_)
+            temp_anno.append(temp_anno_)
+            vid_name.append(vid_name_)
+            vid_num_seg.append(vid_num_seg_)
+
+        return data, label, temp_anno, self.vid_list[index], vid_num_seg
+
+    def get_single_item(self, index):
         data, vid_num_seg, sample_idx = self.get_data(index)
         label, temp_anno = self.get_label(index, vid_num_seg, sample_idx)
-        return data, label, temp_anno, self.vid_list[index], vid_num_seg
+        return torch.stack(data), torch.stack(label), torch.stack(temp_anno), torch.stack(self.vid_list[index]), torch.stack(vid_num_seg)
+
+    def get_all_labels(self):
+        all_labels = []
+        label_group = {k: [] for k in config.class_dict.items()}
+        for i in range(len(self.vid_list)):
+            vid_name = self.vid_list[i]
+            label = np.zeros([self.num_classes], dtype=np.float32)
+            anno_list = self.anno['database'][vid_name]['annotations']
+            for _anno in anno_list:
+                label_idx = self.class_name_to_idx[_anno['label']]
+                label[label_idx] = 1
+                all_labels.append(label)
+                label_group[label_idx].append(i)
+        return all_labels, label_group
 
     def get_data(self, index):
         vid_name = self.vid_list[index]
@@ -107,12 +142,11 @@ class ThumosFeature(data.Dataset):
     def get_label(self, index, vid_num_seg, sample_idx):
         vid_name = self.vid_list[index]
         anno_list = self.anno['database'][vid_name]['annotations']
-        label = np.zeros([self.num_classes], dtype=np.float32)
+        label = self.all_labels[index]
 
         classwise_anno = [[]] * self.num_classes
 
         for _anno in anno_list:
-            label[self.class_name_to_idx[_anno['label']]] = 1
             classwise_anno[self.class_name_to_idx[_anno['label']]].append(_anno)
 
         if self.supervision == 'weak':
