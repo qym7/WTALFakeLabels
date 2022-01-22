@@ -12,9 +12,9 @@ import utils
 import config
 
 
-class ThumosFeature(data.Dataset):
+class GCNThumosFeature(data.Dataset):
     def __init__(self, data_path, mode, modal, feature_fps, num_segments, sampling, seed=-1,
-                 supervision='weak', supervision_path=None):
+                 supervision='weak', supervision_path=None, N=1):
         if seed >= 0:
             utils.set_seed(seed)
 
@@ -42,7 +42,7 @@ class ThumosFeature(data.Dataset):
         anno_file = open(anno_path, 'r')
         self.anno = json.load(anno_file)
         anno_file.close()
-
+        
         self.supervision = supervision
         if self.supervision != 'weak':
             if len(supervision_path) == 0:
@@ -53,16 +53,49 @@ class ThumosFeature(data.Dataset):
 
         self.class_name_to_idx = dict((v, k) for k, v in config.class_dict.items())        
         self.num_classes = len(self.class_name_to_idx.keys())
+        self.all_labels, self.label_group = self.get_all_labels()
 
         self.sampling = sampling
+        self.N = N
 
     def __len__(self):
-        return len(self.vid_list)
+        return len(self.label_group)
 
     def __getitem__(self, index):
+        v_index = np.random.choice(self.label_group[index], self.N)  # 随机选取index类别中的self.N个视频
+        data = []
+        label = []
+        temp_anno = []
+        vid_name = []
+        vid_num_seg = []
+        for idx in v_index:
+            data_, label_, temp_anno_, vid_name_, vid_num_seg_ = self.get_single_item(idx)
+            data.append(data_)
+            label.append(label_)
+            temp_anno.append(temp_anno_)
+            vid_name.append(vid_name_)
+            vid_num_seg.append(vid_num_seg_)
+
+        return np.stack(data), np.stack(label), np.stack(temp_anno), vid_name, vid_num_seg, index
+
+    def get_single_item(self, index):
         data, vid_num_seg, sample_idx = self.get_data(index)
         label, temp_anno = self.get_label(index, vid_num_seg, sample_idx)
         return data, label, temp_anno, self.vid_list[index], vid_num_seg
+
+    def get_all_labels(self):
+        all_labels = []
+        label_group = {k: [] for k in config.class_dict}
+        for i in range(len(self.vid_list)):
+            vid_name = self.vid_list[i]
+            label = np.zeros([self.num_classes], dtype=np.float32)
+            anno_list = self.anno['database'][vid_name]['annotations']
+            for _anno in anno_list:
+                label_idx = self.class_name_to_idx[_anno['label']]
+                label[label_idx] = 1
+                all_labels.append(label)
+                label_group[label_idx].append(i)
+        return all_labels, label_group
 
     def get_data(self, index):
         vid_name = self.vid_list[index]
@@ -102,48 +135,25 @@ class ThumosFeature(data.Dataset):
 
             feature = feature[sample_idx]
 
-        return torch.from_numpy(feature), vid_num_seg, sample_idx
+        return feature, vid_num_seg, sample_idx
 
     def get_label(self, index, vid_num_seg, sample_idx):
         vid_name = self.vid_list[index]
         anno_list = self.anno['database'][vid_name]['annotations']
-        label = np.zeros([self.num_classes], dtype=np.float32)
+        label = self.all_labels[index]
 
         classwise_anno = [[]] * self.num_classes
 
         for _anno in anno_list:
-            label[self.class_name_to_idx[_anno['label']]] = 1
             classwise_anno[self.class_name_to_idx[_anno['label']]].append(_anno)
 
         if self.supervision == 'weak':
             return label, torch.Tensor(0)
         else:
-            # get labels from prepared pickle file
             temp_annot = self.temp_annots[vid_name]
             temp_annot = temp_annot[sample_idx]
-            # # get labels from json file
-            # # every segment is 16 frames: t * fps / num_seg = 16
-            # # t = 16 * num_seg / fps
-            # # t/num_seg = 16 / fps
-            # # num_seg/t = fps / 16 (total seg num / total time)
-            # temp_anno = np.zeros([vid_num_seg, self.num_classes])
-            # t_factor = self.feature_fps / 16
 
-            # for class_idx in range(self.num_classes):
-            #     if label[class_idx] != 1:
-            #         continue
-
-            #     for _anno in classwise_anno[class_idx]:
-            #         tmp_start_sec = float(_anno['segment'][0])
-            #         tmp_end_sec = float(_anno['segment'][1])
-
-            #         tmp_start = round(tmp_start_sec * t_factor)
-            #         tmp_end = round(tmp_end_sec * t_factor)
-
-            #         temp_anno[tmp_start:tmp_end+1, class_idx] = 1
-            # temp_anno = temp_anno[sample_idx, :]
-
-            return label, torch.from_numpy(temp_annot)
+            return label, temp_annot
 
     def random_perturb(self, length):
         if self.num_segments == length:
