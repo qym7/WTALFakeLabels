@@ -88,7 +88,7 @@ if __name__ == "__main__":
 
     criterion = UM_loss(config.alpha, config.beta, config.lmbd, config.neg_lmbd,
                         config.bkg_lmbd, config.margin, config.thres, config.thres_down,
-                        config.gamma_f, config.gamma_c, config.gcn_weight)
+                        config.gamma_f, config.gamma_c, config.gcn_weight, config.N)
 
     optimizer = torch.optim.Adam(net.parameters(), lr=config.lr[0],
         betas=(0.9, 0.999), weight_decay=0.0005)

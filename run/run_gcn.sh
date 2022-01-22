@@ -1,6 +1,6 @@
-model_path='./models/UM-gcn'
-output_path='./outputs/UM-gcn'
-log_path='./logs/UM-gcn'
+model_path='./models/UM-gcn-GT-ave'
+output_path='./outputs/UM-gcn-GT-ave'
+log_path='./logs/UM-gcn-GT-ave'
 seed=0
 data_path='/DATA7_DB7/data/cju/20/BaSNet/dataset/THUMOS14'
 supervision='self'

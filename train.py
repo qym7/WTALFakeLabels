@@ -9,7 +9,7 @@ import utils
 
 class UM_loss(nn.Module):
     def __init__(self, alpha, beta, lmbd, neg_lmbd, bkg_lmbd, margin, thres, thres_down,
-                 gamma_f, gamma_c, gcn_weight):
+                 gamma_f, gamma_c, gcn_weight, N):
         super(UM_loss, self).__init__()
         self.alpha = alpha
         self.beta = beta
@@ -22,6 +22,7 @@ class UM_loss(nn.Module):
         self.gamma_f = gamma_f
         self.gamma_c = gamma_c
         self.gcn_weight = gcn_weight
+        self.N = N
         self.ce_criterion = nn.BCELoss()
 
     def BCE(self, gt, cas):
@@ -117,7 +118,7 @@ class UM_loss(nn.Module):
         return pos_loss + neg_loss
     
     def gcn_loss(self, nodes, nodes_label):
-        n_sample = 8 # sample number for every class
+        n_sample = 4*self.N # sample number for every class
         loss = torch.tensor(0).float().cuda()
         for i in range(len(nodes)):  # iterate different class: 因为每个class的node数量不同，不可并行操作
             node = nodes[i]
