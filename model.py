@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import torch.functional as F
+import torch.nn.functional as F
 
 import scipy.sparse as sp
 
@@ -72,6 +72,7 @@ class GraphConvolution(nn.Module):
         self.in_features = in_features
         self.out_features = out_features
         self.weight = nn.Parameter(torch.FloatTensor(in_features, out_features))
+        self.drop_out = nn.Dropout(p=0.5)
         self.use_bias = bias
         if self.use_bias:
             self.bias = nn.Parameter(torch.FloatTensor(out_features))
@@ -81,10 +82,11 @@ class GraphConvolution(nn.Module):
         nn.init.kaiming_uniform_(self.weight)
         if self.use_bias:
             nn.init.zeros_(self.bias)
-    
+
     def forward(self, input_features, adj):
-        # support = torch.mm(input_features, self.weight)  # 同weight相乘。暂时去除相乘这一步，目前的gcn相当于取相邻节点并average
-        support = input_features  # test for simple average
+        support = torch.mm(input_features, self.weight)  # 同weight相乘。
+        # support = self.drop_out(support)
+        # support = input_features # 
         output = torch.spmm(adj, support)  # 同adj mat相乘
         if self.use_bias:
             return output + self.bias
@@ -99,7 +101,7 @@ class GCN(nn.Module):
     def __init__(self):
         super(GCN, self).__init__()
         self.gcn1 = GraphConvolution(2048, 2048)  # 如果保留feature长度不变的话，这个matrix有点大...
-        # self.gcn2 = GraphConvolution(2048, 2048)
+        self.gcn2 = GraphConvolution(2048, 2048)
 
     def get_adj(self, adj):
         # adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
@@ -110,10 +112,9 @@ class GCN(nn.Module):
 
     def forward(self, X, adj):
         adj = self.get_adj(adj).cuda()
-        # X = F.relu(self.gcn1(X, adj))
-        # X = self.gcn2(X, adj)
-        X = self.gcn1(X, adj)
-        
+        X = F.relu(self.gcn1(X, adj))
+        X = self.gcn2(X, adj)
+        # X = self.gcn1(X, adj)
         # return F.log_softmax(X, dim=1)
         return X
 
@@ -165,6 +166,7 @@ class Model(nn.Module):
                 else:
                     nodes_pos.append((i, bg_pos, 750))
                     bg_pos = 750
+
         return np.stack(nodes), np.stack(nodes_label), nodes_pos
 
     def forward(self, x, gt=None, index=None):

@@ -158,6 +158,7 @@ class UM_loss(nn.Module):
 
         if nodes is not None:
             loss_gcn = self.gcn_weight * self.gcn_loss(nodes, nodes_label)
+            loss_total = loss_total + loss_gcn
             loss["loss_gcn"] = loss_gcn
             print("loss_gcn", (loss_gcn).detach().cpu().item())
 
@@ -221,6 +222,12 @@ def train(net, loader_iter, optimizer, criterion, logger, step, net_teacher, m):
 
     cost.backward()
     optimizer.step()
+    print('gcn')
+    for p in list(filter(lambda p: p.grad is not None, net.GCN.parameters())):
+        print(p.grad.data.norm(2).item())
+    print('CAS_Module')
+    for p in list(filter(lambda p: p.grad is not None, net.cas_module.parameters())):
+        print(p.grad.data.norm(2).item())
 
     if net_teacher is not None:
         # update teacher parameters by EMA

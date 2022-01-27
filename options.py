@@ -46,7 +46,8 @@ def parse_args():
     parser.add_argument('--gamma_f', default=1.0, type=float, help='loss weight for EMA on frame level')
     parser.add_argument('--gamma_c', default=1.0, type=float, help='loss weight for EMA on video class level')
     parser.add_argument('--N', default=1, type=int, help='for every class choose N videos at a time')
-    parser.add_argument('--gcn_weight', default=0.1, type=int, help='loss weight for gcn')
+    parser.add_argument('--gcn_weight', default=0.1, type=float, help='loss weight for gcn')
+    parser.add_argument('--dynamic', default=0, type=int, help='dynamic update or not')
 
     return init_args(parser.parse_args())
 
