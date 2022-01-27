@@ -114,23 +114,23 @@ if __name__ == "__main__":
 
         iou = [test_info['mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1])][-1] for thres in cls_thres]
 
-        # update pseudo-labels
-        if step % 1000 == 0:
-            train_loader.temp_annots = sup_pred_dict
-            cur_gt_iou = test_info['mIoU@0.20_0.20'][-1]
-            net = Model(config.len_feature, config.num_classes, 
-                        config.r_act, config.r_bkg,
-                        config.supervision!='weak')
-            net = net.cuda()
-            net_teacher = None
-            if bool(config.ema):
-                net_teacher = Model(config.len_feature, config.num_classes, 
-                                config.r_act, config.r_bkg,
-                                config.supervision!='weak')
-                net_teacher = net_teacher.cuda()
+        # # update pseudo-labels
+        # if step % 1000 == 0:
+        #     train_loader.temp_annots = sup_pred_dict
+        #     cur_gt_iou = test_info['mIoU@0.20_0.20'][-1]
+        #     net = Model(config.len_feature, config.num_classes, 
+        #                 config.r_act, config.r_bkg,
+        #                 config.supervision!='weak')
+        #     net = net.cuda()
+        #     net_teacher = None
+        #     if bool(config.ema):
+        #         net_teacher = Model(config.len_feature, config.num_classes, 
+        #                         config.r_act, config.r_bkg,
+        #                         config.supervision!='weak')
+        #         net_teacher = net_teacher.cuda()
 
-            optimizer = torch.optim.Adam(net.parameters(), lr=config.lr[0],
-                                         betas=(0.9, 0.999), weight_decay=0.0005)
+        #     optimizer = torch.optim.Adam(net.parameters(), lr=config.lr[0],
+        #                                  betas=(0.9, 0.999), weight_decay=0.0005)
 
         # save model by mIoU
         if max(iou) > best_mIoU:
