@@ -128,7 +128,6 @@ if __name__ == "__main__":
         #                         config.r_act, config.r_bkg,
         #                         config.supervision!='weak')
         #         net_teacher = net_teacher.cuda()
-
         #     optimizer = torch.optim.Adam(net.parameters(), lr=config.lr[0],
         #                                  betas=(0.9, 0.999), weight_decay=0.0005)
 

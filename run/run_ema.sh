@@ -1,6 +1,6 @@
-model_path='./models/UM-val-001-1-EMA-1-1-BCE-09-n'
-output_path='./outputs/UM-val-001-1-EMA-1-1-BCE-09-n'
-log_path='./logs/UM-val-001-1-EMA-1-1-BCE-09-n'
+model_path='./models/UM-val-001-1-EMA-1-1-BCE-0999'
+output_path='./outputs/UM-val-001-1-EMA-1-1-BCE-0999'
+log_path='./logs/UM-val-001-1-EMA-1-1-BCE-0999'
 seed=0
 data_path='/GPFS/public/AR/THUMOS14'
 supervision='self'
@@ -16,8 +16,8 @@ test_dataset='val'
 test_head='sup'
 # Do not change ema
 ema='1'
-m='0.9'
+m='0.999'
 gamma_f='0.01'
 gamma_c='1'
 
-CUDA_VISIBLE_DEVICES=6 python -W ignore ./main.py --model_path ${model_path} --output_path ${output_path} --log_path ${log_path} --seed ${seed} --data_path ${data_path} --supervision ${supervision} --supervision_path ${supervision_path} --thres ${thres} --thres_down ${thres_down} --lmbd ${lmbd} --neg_lmbd ${neg_lmbd} --bkg_lmbd ${bkg_lmbd} --test_dataset ${test_dataset} --test_head ${test_head}  --m ${m} --gamma_f ${gamma_f} --gamma_c ${gamma_c} --ema ${ema}
+CUDA_VISIBLE_DEVICES=5 python -W ignore ./main.py --model_path ${model_path} --output_path ${output_path} --log_path ${log_path} --seed ${seed} --data_path ${data_path} --supervision ${supervision} --supervision_path ${supervision_path} --thres ${thres} --thres_down ${thres_down} --lmbd ${lmbd} --neg_lmbd ${neg_lmbd} --bkg_lmbd ${bkg_lmbd} --test_dataset ${test_dataset} --test_head ${test_head}  --m ${m} --gamma_f ${gamma_f} --gamma_c ${gamma_c} --ema ${ema}

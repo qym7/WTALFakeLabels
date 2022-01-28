@@ -29,14 +29,14 @@ class UM_loss(nn.Module):
         coef_0 = torch.ones(gt.shape[0]).cuda()
         coef_1 = torch.zeros(gt.shape[0]).cuda()
         r = torch.zeros(gt.shape[0]).cuda()
-        pos_gt = torch.any(gt==1, dim=1)
-        r[pos_gt] = gt.shape[-1] / (gt[pos_gt]==1).sum(dim=-1)
+        act_pos = torch.any(gt==1, dim=1)
+        r[act_pos] = gt[act_pos].shape[-1] / (gt[act_pos]==1).sum(dim=-1)
 
         coef_0[r==1] = 0
         coef_1[r==1] = 1
         coef_0[r>1] = 0.5 * r[r>1] / (r[r>1] - 1)
-        coef_1[1>1] = coef_0[r>1] * (r[r>1] - 1)
-            
+        coef_1[r>1] = coef_0[r>1] * (r[r>1] - 1)
+
         _loss_1 = - coef_1 * (gt * torch.log(cas + 0.00001)).mean()
         _loss_0 = - coef_0 * ((1.0 - gt) * torch.log(1.0 - cas + 0.00001)).mean()
         _loss = (_loss_1 + _loss_0).mean()
@@ -63,27 +63,32 @@ class UM_loss(nn.Module):
             loss_neg = torch.tensor(0.).cuda()
         return loss_pos + self.neg_lmbd * loss_neg
 
-    def balanced_ce(self, gt, cas, loss_type='bce'):
+    def balanced_ce(self, gt, cas, label, loss_type='bce'):
         '''
         loss_type = 'bce', 'mse', 'ce'
+        gt: BS * 750 * 20
+        label: BS * 20
         '''
         if self.thres_down < 0:
             gt = (gt > self.thres).float().cuda()
+            gt = torch.permute(gt, (0, 2, 1))
+            gt[~label.bool()] = 0
+            gt = torch.permute(gt, (0, 2, 1))
         else:
             gt = torch.ones_like(gt).cuda() * -1
             gt[gt > self.thres] = 1
             gt[gt <= self.thres_down] = 0
             cas = cas[gt >= 0]
             gt = gt[gt >= 0]
-        
+
         act_loss = torch.tensor(0.).cuda()
         bkg_loss = torch.tensor(0.).cuda()
-        
-        gt_channel_pos = torch.any(gt == 1, dim=2)
-        cas_gt_channel = cas[gt_channel_pos]
-        gt_gt_channel = gt[gt_channel_pos]
-        cas_non_gt_channel = cas[~gt_channel_pos]
-        gt_non_gt_channel = gt[~gt_channel_pos]
+
+        gt_channel_pos = torch.any(gt == 1, dim=1)
+        cas_gt_channel = torch.permute(cas, (0, 2, 1))[gt_channel_pos]
+        gt_gt_channel = torch.permute(gt, (0, 2, 1))[gt_channel_pos]
+        cas_non_gt_channel = torch.permute(cas, (0, 2, 1))[~gt_channel_pos]
+        gt_non_gt_channel = torch.permute(gt, (0, 2, 1))[~gt_channel_pos]
 
         if loss_type == 'bce':
             act_loss = self.BCE(gt_gt_channel, cas_gt_channel)
@@ -99,7 +104,6 @@ class UM_loss(nn.Module):
         # bkg_loss = bkg_loss / (~gt_channel_pos).sum()
 
         return act_loss, bkg_loss
-
 
     def forward(self, score_act, score_bkg, feat_act, feat_bkg, label,
                 gt, cas, score_act_t=None, score_bkg_t=None, cas_t=None, step=0):
@@ -122,7 +126,7 @@ class UM_loss(nn.Module):
         loss_total = loss_cls + self.alpha * loss_um + self.beta * loss_be
 
         if cas is not None:
-            loss_sup_act, loss_sup_bkg = self.balanced_ce(gt, cas, 'bce')
+            loss_sup_act, loss_sup_bkg = self.balanced_ce(gt, cas, label, 'bce')
             loss_sup_act = self.lmbd * loss_sup_act
             loss_sup_bkg = self.lmbd * self.bkg_lmbd * loss_sup_bkg
             loss_sup = loss_sup_act + loss_sup_bkg
