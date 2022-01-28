@@ -57,8 +57,8 @@ class Config(object):
         self.gamma_f = args.gamma_f
         self.gamma_c = args.gamma_c
         self.N = args.N
-        self.gcn_weight = args.gcn_weight
         self.dynamic = args.dynamic
+        self.gcnn_weight = args.gcnn_weight
 
 
     def __str__(self):

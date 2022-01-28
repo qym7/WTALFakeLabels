@@ -84,14 +84,40 @@ class GraphConvolution(nn.Module):
             nn.init.zeros_(self.bias)
 
     def forward(self, input_features, adj):
-        support = torch.mm(input_features, self.weight)  # 同weight相乘。
-        # support = self.drop_out(support)
-        # support = input_features # 
+        support = torch.mm(input_features, self.weight)  # 同weight相乘
+        support = input_features
         output = torch.spmm(adj, support)  # 同adj mat相乘
+        # print(output)
         if self.use_bias:
             return output + self.bias
         else:
             return output
+
+
+class GCN_Module(nn.Module):
+    '''
+    Reference: https://www.cnblogs.com/foghorn/p/15240260.html
+    '''
+    def __init__(self):
+        super(GCN_Module, self).__init__()
+        self.gcn1 = GraphConvolution(2048, 2048)
+        self.gcn2 = GraphConvolution(2048, 2048)
+
+    def get_adj(self, adj):
+        adj = sp.csr_matrix(adj)
+        # adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
+        adj = normalize(adj + sp.eye(adj.shape[0]))
+        adj = sparse_mx_to_torch_sparse_tensor(adj)
+
+        return adj
+
+    def forward(self, X, adj):
+        adj = self.get_adj(adj).cuda()
+        # X = F.relu(self.gcn1(X, adj))
+        # X = self.gcn2(X, adj)
+        X = self.gcn1(X, adj)
+
+        return X
 
 
 class GCN(nn.Module):
@@ -100,23 +126,29 @@ class GCN(nn.Module):
     '''
     def __init__(self):
         super(GCN, self).__init__()
-        self.gcn1 = GraphConvolution(2048, 2048)  # 如果保留feature长度不变的话，这个matrix有点大...
-        self.gcn2 = GraphConvolution(2048, 2048)
+        self.gcn_module = GCN_Module()
 
-    def get_adj(self, adj):
-        # adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
-        adj = normalize(sp.csr_matrix(adj) + sp.eye(adj.shape[0]))
-        adj = sparse_mx_to_torch_sparse_tensor(adj)
+    def forward(self, x, gt, index):
+        nodes = []
+        nodes_label = []
+        new_x = torch.zeros_like(x)
+        for i in range(len(x)):  # bs * N * T * 20, bs也意味着有bs类的视频，每类视频有N个
+            vid_cls = x[i]
+            gt_cls = gt[i, :, :, index[i]]  # N * T
+            nodes_, nodes_label_, nodes_pos_ = group_node(vid_cls, gt_cls)  # 由于只有在同类视频里产生节点图，所以需要迭代循环所有类
+            adj = generate_adj_matrix(nodes_label_)
+            # pass to GCN
+            x_ = self.gcn_module(torch.from_numpy(nodes_).detach().cuda(), adj)  # 根据gcn处理后的node和node在特征中的位置更新features
+            for j, pos in enumerate(nodes_pos_):
+                new_x[i, pos[0], pos[1]:pos[2]] = x_[j].repeat(pos[2]-pos[1], 1)
+            nodes.append(x_)  # 产生N个同类视频的节点
 
-        return adj
+            nodes_label.append(torch.from_numpy(nodes_label_).cuda())  # 产生上述节点对应标签，1为action，0为bkg，-1为不确定
 
-    def forward(self, X, adj):
-        adj = self.get_adj(adj).cuda()
-        X = F.relu(self.gcn1(X, adj))
-        X = self.gcn2(X, adj)
-        # X = self.gcn1(X, adj)
-        # return F.log_softmax(X, dim=1)
-        return X
+        gt = gt.reshape(-1, gt.shape[-2], gt.shape[-1])
+        new_x = new_x.reshape(-1, x.shape[-2], x.shape[-1])
+
+        return new_x, gt, nodes, nodes_label
 
 
 class Model(nn.Module):
@@ -127,7 +159,6 @@ class Model(nn.Module):
         self.num_classes = num_classes
         self.self_train = self_train
 
-        self.GCN = GCN()
         self.cas_module = CAS_Module(len_feature, num_classes, self_train)
 
         self.softmax = nn.Softmax(dim=1)
@@ -138,58 +169,8 @@ class Model(nn.Module):
         self.r_bkg = r_bkg
 
         self.drop_out = nn.Dropout(p=0.7)
-    
-    def group_node(self, x, gt, thres1=0.2, thres2=0.4):
-        '''
-        gt: bs * T * 20
-        return:
-        nodes: list of bs elements, 每一个元素是Ni*2048的矩阵，表示N个同类视频中的节点
-        '''
-        x_label = np.ones_like(gt.detach().cpu().numpy()) * 1
-        x_label[gt.detach().cpu().numpy()>thres2] = 2
-        x_label[gt.detach().cpu().numpy()<=thres1] = 0
-        nodes = []
-        nodes_label = []
-        nodes_pos = []
-        for i, (feat, gt_vid) in enumerate(zip(x.detach().cpu().numpy(), x_label)):  # 迭代循环一类下的N个视频，由于每个视频产生的节点数不同，只能通过循环处理
-            split_pos = np.where(np.diff(gt_vid) != 0)[0] + 1
-            split_gt = np.split(gt_vid, split_pos)
-            split_x = np.split(feat, split_pos)
-            bg_pos = 0
-            for j in range(len(split_pos)+1):
-                nodes_label.append(split_gt[j].mean())
-                node = split_x[j].mean(axis=0)
-                nodes.append(node)
-                if j < len(split_pos):
-                    nodes_pos.append((i, bg_pos, bg_pos+len(split_x[j])))
-                    bg_pos += len(split_x[j])
-                else:
-                    nodes_pos.append((i, bg_pos, 750))
-                    bg_pos = 750
 
-        return np.stack(nodes), np.stack(nodes_label), nodes_pos
-
-    def forward(self, x, gt=None, index=None):
-        nodes = []
-        nodes_label = []
-
-        if gt is not None:
-            if index is None:
-                raise('index should not be none!')
-            for i in range(len(x)):  # bs * N * T * 20, bs也意味着有bs类的视频，每类视频有N个
-                vid_cls = x[i]
-                gt_cls = gt[i, :, :, index[i]]  # N * T
-                nodes_, nodes_label_, nodes_pos_ = self.group_node(vid_cls, gt_cls)  # 由于只有在同类视频里产生节点图，所以需要迭代循环所有类
-                nodes.append(torch.from_numpy(nodes_).cuda())  # 产生N个同类视频的节点
-                nodes_label.append(torch.from_numpy(nodes_label_).cuda())  # 产生上述节点对应标签，1为action，0为bkg，-1为不确定
-                adj = generate_adj_matrix(nodes_label_)
-                # pass to GCN
-                x_ = self.GCN(torch.from_numpy(nodes_).cuda(), adj)  # 根据gcn处理后的node和node在特征中的位置更新features
-                for j, pos in enumerate(nodes_pos_):
-                    x[i, pos[0], pos[1]:pos[2]] = x_[j].repeat(pos[2]-pos[1], 1)
-
-            gt = gt.reshape(-1, gt.shape[-2], gt.shape[-1])
-
+    def forward(self, x):
         x = x.reshape(-1, x.shape[-2], x.shape[-1])
         num_segments = x.shape[1]
         k_act = num_segments // self.r_act
@@ -233,4 +214,4 @@ class Model(nn.Module):
 
         cas_softmax = self.softmax_2(cas)
 
-        return score_act, score_bkg, feat_act, feat_bkg, features, cas_softmax, sup_cas_softmax, nodes, nodes_label
+        return score_act, score_bkg, feat_act, feat_bkg, features, cas_softmax, sup_cas_softmax

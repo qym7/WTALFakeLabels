@@ -25,7 +25,7 @@ def parse_args():
     parser.add_argument('--r_act', type=float, default=9)
     parser.add_argument('--r_bkg', type=float, default=4)
     parser.add_argument('--class_th', type=float, default=0.2)
-    parser.add_argument('--lr', type=str, default='[0.0001]*10000', help='learning rates for steps(list form)')
+    parser.add_argument('--lr', type=str, default='[0.0001]*10000', help='learning rates for steps(list form)')  # [0.0001]
     parser.add_argument('--batch_size', type=int, default=16)
     parser.add_argument('--num_workers', type=int, default=8)
     parser.add_argument('--seed', type=int, default=-1, help='random seed (-1 for no manual seed)')
@@ -46,7 +46,7 @@ def parse_args():
     parser.add_argument('--gamma_f', default=1.0, type=float, help='loss weight for EMA on frame level')
     parser.add_argument('--gamma_c', default=1.0, type=float, help='loss weight for EMA on video class level')
     parser.add_argument('--N', default=1, type=int, help='for every class choose N videos at a time')
-    parser.add_argument('--gcn_weight', default=0.1, type=float, help='loss weight for gcn')
+    parser.add_argument('--gcnn_weight', default=0.1, type=float, help='loss weight for gcn')
     parser.add_argument('--dynamic', default=0, type=int, help='dynamic update or not')
 
     return init_args(parser.parse_args())

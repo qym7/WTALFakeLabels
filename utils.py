@@ -275,13 +275,44 @@ def generate_adj_matrix(nodes_label):
     diff_edges = list(product(diff_edges, diff_edges+1))
     act_edges = np.where(nodes_label == 2)[0]  # act之间的边
     act_edges = list(product(act_edges, act_edges))
-    bkg_edges = np.where(nodes_label == 2)[0]  # bkg之间的边
+    bkg_edges = np.where(nodes_label == 0)[0]  # bkg之间的边
     bkg_edges = list(product(bkg_edges, bkg_edges))
     adj = np.zeros((len(nodes_label), len(nodes_label)))
-    np.add.at(adj, tuple(zip(*diff_edges)), 1)
+    if len(diff_edges) > 0:
+        np.add.at(adj, tuple(zip(*diff_edges)), 1)
     np.add.at(adj, tuple(zip(*act_edges)), 1)
     np.add.at(adj, tuple(zip(*bkg_edges)), 1)
     np.fill_diagonal(adj, 0)  # 消除act和bkg product中产生的自己指向自己的边，这个自指边在adjacent matrix后续normalize过程中会加上
     adj = np.logical_or(adj, (adj.T)).astype(float)
     
     return adj
+
+def group_node(x, gt, thres1=0.2, thres2=0.4):
+    '''
+    gt: bs * T * 20
+    return:
+    nodes: list of bs elements, 每一个元素是Ni*2048的矩阵，表示N个同类视频中的节点
+    '''
+    x_label = np.ones_like(gt.detach().cpu().numpy())
+    x_label[gt.detach().cpu().numpy()>thres2] = 2
+    x_label[gt.detach().cpu().numpy()<=thres1] = 0
+    nodes = []
+    nodes_label = []
+    nodes_pos = []
+    for i, (feat, gt_vid) in enumerate(zip(x.detach().cpu().numpy(), x_label)):  # 迭代循环一类下的N个视频，由于每个视频产生的节点数不同，只能通过循环处理
+        split_pos = np.where(np.diff(gt_vid) != 0)[0] + 1
+        split_gt = np.split(gt_vid, split_pos)
+        split_x = np.split(feat, split_pos)
+        bg_pos = 0
+        for j in range(len(split_pos)+1):
+            nodes_label.append(split_gt[j].mean())
+            node = split_x[j].mean(axis=0)
+            nodes.append(node)
+            if j < len(split_pos):
+                nodes_pos.append((i, bg_pos, bg_pos+len(split_x[j])))
+                bg_pos += len(split_x[j])
+            else:
+                nodes_pos.append((i, bg_pos, 750))
+                bg_pos = 750
+
+    return np.stack(nodes), np.stack(nodes_label), nodes_pos

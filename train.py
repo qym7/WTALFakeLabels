@@ -7,9 +7,50 @@ from collections import OrderedDict
 import utils
 
 
+class GCNN_loss(nn.Module):
+    def __init__(self, gcnn_weight):
+        super(GCNN_loss, self).__init__()
+        self.gcnn_weight = gcnn_weight
+
+    def contrastive_loss(self, node, pos_nodes, neg_nodes):
+        pos_sim = torch.norm(pos_nodes - node, p=2, dim=1)
+        neg_sim = torch.norm(neg_nodes - node, p=2, dim=1)
+        pos_loss = torch.tensor(0).cuda()
+        neg_loss = torch.tensor(0).cuda()
+        # 在这里更改similarity的格式
+        similarity = nn.CosineSimilarity(dim=0)
+        if pos_nodes.shape[0] != 0:
+            # print('pos', torch.argmax(pos_sim), torch.max(nn.functional.gumbel_softmax(pos_sim)))
+            pos_sample = pos_nodes[torch.argmax(pos_sim).detach()]
+            # pos_sample = torch.matmul(nn.functional.gumbel_softmax(pos_sim), pos_nodes)  # choose most different positive sample
+            pos_loss = similarity(node, pos_sample)
+        if neg_nodes.shape[0] != 0:
+            # print('neg', torch.argmax(neg_sim),  torch.max(nn.functional.gumbel_softmax(neg_sim)))
+            # neg_sample = torch.matmul(nn.functional.gumbel_softmax(-neg_sim), neg_nodes)  # choose most similar negetive sample
+            neg_sample = neg_nodes[torch.argmax(neg_sim).detach()]
+            neg_loss = similarity(node, neg_sample)
+
+        return pos_loss + neg_loss
+
+    def forward(self, nodes, nodes_label):
+        loss = torch.tensor(0).float().cuda()
+        for i in range(len(nodes)):  # iterate different class: 因为每个class的node数量不同，不可并行操作
+            node = nodes[i]
+            node_label = nodes_label[i]  # N * 2048
+            pos_node = node[node_label==2]
+            neg_node = node[node_label==0]
+            for i, n in enumerate(node):
+                if node_label[i] == 0:
+                    loss += self.contrastive_loss(n, neg_node, pos_node)
+                else:
+                    loss += self.contrastive_loss(n, pos_node, neg_node)
+        
+        return loss * self.gcnn_weight
+
+
 class UM_loss(nn.Module):
     def __init__(self, alpha, beta, lmbd, neg_lmbd, bkg_lmbd, margin, thres, thres_down,
-                 gamma_f, gamma_c, gcn_weight, N):
+                 gamma_f, gamma_c, N):
         super(UM_loss, self).__init__()
         self.alpha = alpha
         self.beta = beta
@@ -21,7 +62,6 @@ class UM_loss(nn.Module):
         self.thres_down = thres_down
         self.gamma_f = gamma_f
         self.gamma_c = gamma_c
-        self.gcn_weight = gcn_weight
         self.N = N
         self.ce_criterion = nn.BCELoss()
 
@@ -31,14 +71,14 @@ class UM_loss(nn.Module):
         coef_0 = torch.ones(gt.shape[0]).cuda()
         coef_1 = torch.zeros(gt.shape[0]).cuda()
         r = torch.zeros(gt.shape[0]).cuda()
-        pos_gt = torch.any(gt==1, dim=1)
-        r[pos_gt] = gt.shape[-1] / (gt[pos_gt]==1).sum(dim=-1)
+        act_pos = torch.any(gt==1, dim=1)
+        r[act_pos] = gt[act_pos].shape[-1] / (gt[act_pos]==1).sum(dim=-1)
 
         coef_0[r==1] = 0
         coef_1[r==1] = 1
         coef_0[r>1] = 0.5 * r[r>1] / (r[r>1] - 1)
-        coef_1[1>1] = coef_0[r>1] * (r[r>1] - 1)
-            
+        coef_1[r>1] = coef_0[r>1] * (r[r>1] - 1)
+
         _loss_1 = - coef_1 * (gt * torch.log(cas + 0.00001)).mean()
         _loss_0 = - coef_0 * ((1.0 - gt) * torch.log(1.0 - cas + 0.00001)).mean()
         _loss = (_loss_1 + _loss_0).mean()
@@ -65,27 +105,32 @@ class UM_loss(nn.Module):
             loss_neg = torch.tensor(0.).cuda()
         return loss_pos + self.neg_lmbd * loss_neg
 
-    def balanced_ce(self, gt, cas, loss_type='bce'):
+    def balanced_ce(self, gt, cas, label, loss_type='bce'):
         '''
         loss_type = 'bce', 'mse', 'ce'
+        gt: BS * 750 * 20
+        label: BS * 20
         '''
         if self.thres_down < 0:
             gt = (gt > self.thres).float().cuda()
+            gt = torch.permute(gt, (0, 2, 1))
+            gt[~label.bool()] = 0
+            gt = torch.permute(gt, (0, 2, 1))
         else:
             gt = torch.ones_like(gt).cuda() * -1
             gt[gt > self.thres] = 1
             gt[gt <= self.thres_down] = 0
             cas = cas[gt >= 0]
             gt = gt[gt >= 0]
-        
+
         act_loss = torch.tensor(0.).cuda()
         bkg_loss = torch.tensor(0.).cuda()
 
-        gt_channel_pos = torch.any(gt == 1, dim=2)
-        cas_gt_channel = cas[gt_channel_pos]
-        gt_gt_channel = gt[gt_channel_pos]
-        cas_non_gt_channel = cas[~gt_channel_pos]
-        gt_non_gt_channel = gt[~gt_channel_pos]
+        gt_channel_pos = torch.any(gt == 1, dim=1)
+        cas_gt_channel = torch.permute(cas, (0, 2, 1))[gt_channel_pos]
+        gt_gt_channel = torch.permute(gt, (0, 2, 1))[gt_channel_pos]
+        cas_non_gt_channel = torch.permute(cas, (0, 2, 1))[~gt_channel_pos]
+        gt_non_gt_channel = torch.permute(gt, (0, 2, 1))[~gt_channel_pos]
 
         if loss_type == 'bce':
             act_loss = self.BCE(gt_gt_channel, cas_gt_channel)
@@ -101,43 +146,10 @@ class UM_loss(nn.Module):
         # bkg_loss = bkg_loss / (~gt_channel_pos).sum()
 
         return act_loss, bkg_loss
-    
-    def contrastive_loss(self, node, pos_nodes, neg_nodes):
-        pos_sim = torch.norm(pos_nodes - node, p=2, dim=1)
-        neg_sim = torch.norm(neg_nodes - node, p=2, dim=1)
-        pos_loss = torch.tensor(0).cuda()
-        neg_loss = torch.tensor(0).cuda()
-        # 在这里更改similarity的格式
-        similarity = nn.CosineSimilarity(dim=0)
-        if pos_nodes.shape[0] != 0:
-            pos_sample = pos_nodes[torch.argmax(pos_sim)]  # choose most different positive sample
-            pos_loss = similarity(node, pos_sample)
-        if neg_nodes.shape[0] != 0:
-            neg_sample = neg_nodes[torch.argmin(neg_sim)]  # choose most similar negetive sample
-            neg_loss = similarity(node, neg_sample)
-        return pos_loss + neg_loss
-    
-    def gcn_loss(self, nodes, nodes_label):
-        n_sample = 4*self.N # sample number for every class
-        loss = torch.tensor(0).float().cuda()
-        for i in range(len(nodes)):  # iterate different class: 因为每个class的node数量不同，不可并行操作
-            node = nodes[i]
-            node_label = nodes_label[i]  # N * 2048
-            pos_node = node[node_label==1]
-            neg_node = node[node_label==0]
-            for i in range(n_sample):
-                idx = np.random.choice((torch.where(node_label!=-1)[0]).detach().cpu().numpy())
-                if node_label[idx] == 0:
-                    loss += self.contrastive_loss(node[idx], neg_node, pos_node)
-                else:
-                    loss += self.contrastive_loss(node[idx], pos_node, neg_node)
-        
-        return loss
 
     def forward(self, score_act, score_bkg, feat_act, feat_bkg, label,
                 gt, cas, nodes=None, nodes_label=None,
-                score_act_t=None, score_bkg_t=None, cas_t=None,
-                nodes_t=None, nodes_label_t=None, step=0):
+                score_act_t=None, score_bkg_t=None, cas_t=None, step=0):
         loss = {}
  
         label = label / torch.sum(label, dim=1, keepdim=True)
@@ -156,12 +168,6 @@ class UM_loss(nn.Module):
 
         loss_total = loss_cls + self.alpha * loss_um + self.beta * loss_be
 
-        if nodes is not None:
-            loss_gcn = self.gcn_weight * self.gcn_loss(nodes, nodes_label)
-            loss_total = loss_total + loss_gcn
-            loss["loss_gcn"] = loss_gcn
-            print("loss_gcn", (loss_gcn).detach().cpu().item())
-
         # if cas is not None:
         #     loss_sup_act, loss_sup_bkg = self.balanced_ce(gt, cas, 'bce')
         #     loss_sup_act = self.lmbd * loss_sup_act
@@ -171,10 +177,8 @@ class UM_loss(nn.Module):
         #     loss_total = loss_total + loss_sup
         #     loss["loss_sup_act"] = loss_sup_act
         #     loss["loss_sup_bkg"] = loss_sup_bkg
-        #     loss["loss_sup"] = loss_sup_bkg
         #     print("loss_sup_act", (loss_sup_act).detach().cpu().item())
         #     print("loss_sup_bkg", (loss_sup_bkg).detach().cpu().item())
-        #     print("loss_sup", (loss_sup).detach().cpu().item())
         
         # if cas_t is not None:
         #     loss_ema_f = self.gamma_f * torch.norm(cas - cas_t, p=2).mean()
@@ -197,37 +201,33 @@ class UM_loss(nn.Module):
 
         return loss_total, loss
 
-def train(net, loader_iter, optimizer, criterion, logger, step, net_teacher, m):
+
+def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterion_gcnn, logger, step, net_teacher, m):
     net.train()
 
     _data, _label, _gt, _, _, index = next(loader_iter)
     _data = _data.cuda()  # reshaped in net
-    _label = _label.reshape(-1, _label.shape[-1]).cuda()
     _gt = _gt.cuda()  # reshaped in net
+    _label = _label.reshape(-1, _label.shape[-1]).cuda()
+    
+    _data, _gt, nodes, nodes_label = gcnn(_data, _gt, index)
+    cost_gcnn = criterion_gcnn(nodes, nodes_label)
+
+    _data = _data.detach()
+    _gt = _gt.detach()
+    score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax = net(_data)
+
+    cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
+                            _gt, sup_cas_softmax, step=step)
+    loss['loss_gcnn'] = cost_gcnn
+    print("loss_gcnn", cost_gcnn.detach().cpu().item())
 
     optimizer.zero_grad()
-    score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax, nodes, nodes_label = net(_data, _gt, index)
-    _gt = _gt.reshape(-1, _gt.shape[-2], _gt.shape[-1])
-    _data = _data.reshape(-1, _data.shape[-2], _data.shape[-1])
-
-    if net_teacher is not None:
-        score_act_t, score_bkg_t, _, _, _, _, sup_cas_softmax_t, nodes_t, nodes_label_t = net_teacher(_data, _gt, index)
-        cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
-                               _gt, sup_cas_softmax, nodes, nodes_label,
-                               score_act_t, score_bkg_t, sup_cas_softmax_t, nodes_t, nodes_label_t, step=step)
-    else:
-        cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
-                               _gt, sup_cas_softmax, nodes, nodes_label,
-                               step=step)
-
+    optimizer_gcnn.zero_grad()
+    cost_gcnn.backward()
     cost.backward()
     optimizer.step()
-    print('gcn')
-    for p in list(filter(lambda p: p.grad is not None, net.GCN.parameters())):
-        print(p.grad.data.norm(2).item())
-    print('CAS_Module')
-    for p in list(filter(lambda p: p.grad is not None, net.cas_module.parameters())):
-        print(p.grad.data.norm(2).item())
+    optimizer_gcnn.step()
 
     if net_teacher is not None:
         # update teacher parameters by EMA
