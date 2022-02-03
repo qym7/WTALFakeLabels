@@ -23,29 +23,31 @@ class GCNN_loss(nn.Module):
             # print('pos', torch.argmax(pos_sim), torch.max(nn.functional.gumbel_softmax(pos_sim)))
             pos_sample = pos_nodes[torch.argmax(pos_sim).detach()]
             # pos_sample = torch.matmul(nn.functional.gumbel_softmax(pos_sim), pos_nodes)  # choose most different positive sample
-            pos_loss = similarity(node, pos_sample)
+            pos_loss = 1 - similarity(node, pos_sample)
         if neg_nodes.shape[0] != 0:
             # print('neg', torch.argmax(neg_sim),  torch.max(nn.functional.gumbel_softmax(neg_sim)))
             # neg_sample = torch.matmul(nn.functional.gumbel_softmax(-neg_sim), neg_nodes)  # choose most similar negetive sample
-            neg_sample = neg_nodes[torch.argmax(neg_sim).detach()]
+            neg_sample = neg_nodes[torch.argmin(neg_sim).detach()]
             neg_loss = similarity(node, neg_sample)
 
         return pos_loss + neg_loss
 
     def forward(self, nodes, nodes_label):
         loss = torch.tensor(0).float().cuda()
+        total_count = torch.tensor(0).cuda()
         for i in range(len(nodes)):  # iterate different class: 因为每个class的node数量不同，不可并行操作
             node = nodes[i]
             node_label = nodes_label[i]  # N * 2048
             pos_node = node[node_label==2]
             neg_node = node[node_label==0]
-            for i, n in enumerate(node):
-                if node_label[i] == 0:
+            for j, n in enumerate(node):
+                if node_label[j] == 0:
                     loss += self.contrastive_loss(n, neg_node, pos_node)
                 else:
                     loss += self.contrastive_loss(n, pos_node, neg_node)
-        
-        return loss * self.gcnn_weight
+                total_count += 1
+                
+        return loss / total_count * self.gcnn_weight
 
 
 class UM_loss(nn.Module):
@@ -202,19 +204,33 @@ class UM_loss(nn.Module):
         return loss_total, loss
 
 
-def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterion_gcnn, logger, step, net_teacher, m):
+def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterion_gcnn, logger, step, net_teacher, m, nodes_dict):
     net.train()
 
-    _data, _label, _gt, _, _, index = next(loader_iter)
+    _data, _label, _gt, vid_names, _, index = next(loader_iter)
+    N = _data.shape[1]
     _data = _data.cuda()  # reshaped in net
     _gt = _gt.cuda()  # reshaped in net
     _label = _label.reshape(-1, _label.shape[-1]).cuda()
-    
-    _data, _gt, nodes, nodes_label = gcnn(_data, _gt, index)
+
+    _data, nodes, nodes_label, vids_label = gcnn(_data, _gt, index, vid_names)
     cost_gcnn = criterion_gcnn(nodes, nodes_label)
 
+    ######################## ema code to be deleted
+    for i in range(len(nodes)):
+        class_node = nodes[i]
+        vid_label = vids_label[i]
+        for j in range(N):
+            vid_cls_name = vid_names[i][j]+f'_{index[i]}'
+            if vid_cls_name not in nodes_dict:
+                nodes_dict[vid_cls_name] = nodes[i][vid_label==j].detach()
+            else:
+                nodes[i][vid_label==j] = nodes[i][vid_label==j] * 0.01 + nodes_dict[vid_cls_name] * 0.99
+                nodes_dict[vid_cls_name] = nodes[i][vid_label==j].detach()
+    ########################
+
     _data = _data.detach()
-    _gt = _gt.detach()
+    _gt = _gt.reshape(-1, _gt.shape[-2], _gt.shape[-1]).detach()
     score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax = net(_data)
 
     cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,

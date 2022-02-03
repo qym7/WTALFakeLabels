@@ -32,11 +32,15 @@ if __name__ == "__main__":
                 config.r_act, config.r_bkg,
                 config.supervision!='weak')
     net = net.cuda()
+    gcnn = GCN()
+    gcnn = gcnn.cuda()
     print(2)
+
     test_loader = data.DataLoader(
         ThumosFeature(data_path=config.data_path, mode=config.test_dataset,
                         modal=config.modal, feature_fps=config.feature_fps,
-                        num_segments=config.num_segments, supervision='weak',
+                        num_segments=config.num_segments, supervision=config.supervision,
+                        supervision_path=config.supervision_path,
                         seed=config.seed, sampling='uniform'),
             batch_size=1,
             shuffle=False, num_workers=config.num_workers,
@@ -46,7 +50,8 @@ if __name__ == "__main__":
         gt = pickle.load(f)
 
     thres = np.arange(0.1, 1, 0.1)
-    cls_thres = [(round(t_l, 2), round(t_h, 2)) for i, t_l in enumerate(thres) for t_h in thres[i:]]
+    # cls_thres = [(round(t_l, 2), round(t_h, 2)) for i, t_l in enumerate(thres) for t_h in thres[i:]]
+    cls_thres = [(round(t_h, 2), round(t_h, 2))for t_h in thres]
     test_info = {"step": [], "test_acc": [],
                  "average_mAP": [],
                  "mAP@0.1": [], "mAP@0.2": [], "mAP@0.3": [], 
@@ -59,7 +64,7 @@ if __name__ == "__main__":
 
     logger = Logger(config.log_path)
 
-    test(net, config, logger, test_loader, test_info, 0, gt,
+    test(net, gcnn, config, logger, test_loader, test_info, 0, gt,
          cls_thres=cls_thres, model_file=config.model_file,
          save=config.save)
 

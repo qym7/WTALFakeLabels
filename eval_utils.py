@@ -4,9 +4,13 @@ import pickle
 
 from matplotlib import colors
 
+import torch
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 
 from config import class_dict
 
@@ -225,6 +229,57 @@ def plot_pred(cas, gt, video_name, save_path):
             class_name = class_dict[i]
             plot_one_class(cas[:, i], gt[:, i], class_name,
                            video_name, save_path)
+
+
+def visualise_PCA(X, y, class_lst, save_path):
+    pca_2 = PCA(n_components=2)
+    pca_2_res = pca_2.fit_transform(X)
+    pca_3 = PCA(n_components=3)
+    pca_3_res = pca_3.fit_transform(X)
+
+    plt.figure(figsize=(5, 5))
+    act_pos = y == 2
+    bkg_pos = y == 0
+    unk_pos = y == 1
+
+    plt.scatter(pca_2_res[:, 0][act_pos], pca_2_res[:, 1][act_pos],
+                c=class_lst[act_pos], label="PCA", cmap='Oranges')
+    plt.colorbar()
+    plt.scatter(pca_2_res[:, 0][bkg_pos], pca_2_res[:, 1][bkg_pos],
+                c=class_lst[bkg_pos], label="PCA", cmap='Greens')
+    plt.colorbar()
+    plt.scatter(pca_2_res[:, 0][unk_pos], pca_2_res[:, 1][unk_pos],
+                c=class_lst[unk_pos], label="PCA", cmap='Blues')
+    plt.colorbar()
+    plt.xlabel(pca_2.explained_variance_ratio_[0])
+    plt.ylabel(pca_2.explained_variance_ratio_[1])
+    plt.title('PCA2 for nodes of different type')
+    plt.legend()
+    file_path = os.path.join(save_path, 'inner_pca2.png')
+    plt.savefig(file_path, dpi=120)
+
+
+def plot_node(nodes, nodes_label, class_lst, save_path):
+    '''
+    Function to plot and save
+    Args:
+        - nodes: list of numpy array of size Ni * 2048
+        - nodes_label: list of numpy array of size Ni
+        - label: list of ints, class of one element in nodes
+    '''
+    nodes = np.concatenate(nodes)
+    nodes_label = np.concatenate(nodes_label)
+    class_lst = np.concatenate(class_lst)
+    num_act = len(nodes)
+    visualise_PCA(nodes,
+                  nodes_label,
+                  class_lst,
+                  save_path)
+    # for i in range(cas.shape[1]):
+    #     if sum(gt[:, i]) > 0:
+    #         class_name = class_dict[i]
+    #         plot_one_class(cas[:, i], gt[:, i], class_name,
+    #                        video_name, save_path)
 
 if __name__ == '__main__':
     # save_gt()

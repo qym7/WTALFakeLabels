@@ -9,10 +9,10 @@ import os
 import json
 import pickle
 from eval.eval_detection import ANETdetection
-from eval_utils import plot_pred
+from eval_utils import plot_pred, plot_node
 
 
-def test(net, config, logger, test_loader, test_info, step, gt,
+def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
          cls_thres=np.arange(0.1, 1, 0.1),
          model_file=None, save=False):
     with torch.no_grad():
@@ -23,6 +23,9 @@ def test(net, config, logger, test_loader, test_info, step, gt,
 
         wtal_pred_dict = {}
         sup_pred_dict = {}
+        nodes_lst = []
+        nodes_label_lst = []
+        class_lst = []
         savefig_path = os.path.join(config.output_path, 'casplot')
         savefig_path = os.path.abspath(savefig_path)
         if not os.path.exists(savefig_path):
@@ -40,10 +43,29 @@ def test(net, config, logger, test_loader, test_info, step, gt,
 
         for i in range(len(test_loader.dataset)):
 
-            _data, _label, _, vid_name, vid_num_seg = next(load_iter)
+            # GCN inner video merge version
+            _data, _label, _gt, vid_name, vid_num_seg = next(load_iter)
+            _data = _data.reshape(1, 1, _data.shape[-2], _data.shape[-1]).cuda()
+            _gt = _gt.reshape(1, 1, _gt.shape[-2], _gt.shape[-1]).cuda()
+            _label = _label.reshape(-1, _label.shape[-1]).cuda()
 
-            _data = _data.cuda()
-            _label = _label.cuda()
+            new_data = torch.zeros_like(_data.reshape(-1, _data.shape[-2], _data.shape[-1]))
+            for index in torch.where(_label[0]==1)[0]:
+                cur_data, cur_nodes, cur_nodes_label, _ = gcnn(_data, _gt, [index], eval=True)
+                new_data += cur_data
+                nodes_lst.append(torch.stack(cur_nodes)[0].detach().cpu().numpy())
+                nodes_label_lst.append(torch.stack(cur_nodes_label)[0].detach().cpu().numpy())
+                class_lst.append(np.ones(len(cur_nodes[0]))*(index.detach().cpu().item()))
+            _data = new_data/len(torch.where(_label[0]==1)[0])
+            
+            _data = _data.detach()
+            _gt = _gt.detach()
+
+            # # normal version
+            # _data, _label, _, vid_name, vid_num_seg = next(load_iter)
+
+            # _data = _data.cuda()
+            # _label = _label.cuda()
 
             vid_num_seg = vid_num_seg[0].cpu().item()
             num_segments = _data.shape[1]
@@ -74,7 +96,6 @@ def test(net, config, logger, test_loader, test_info, step, gt,
 
             if len(pred) == 0:
                 pred = np.array([np.argmax(score_np)])
-
             cas_pred = cas[0].cpu().numpy()[:, pred]
             cas_pred = np.reshape(cas_pred, (num_segments, -1, 1))
             cas_pred = utils.upgrade_resolution(cas_pred, config.scale)
@@ -142,18 +163,21 @@ def test(net, config, logger, test_loader, test_info, step, gt,
             cas_ = utils.get_cas(gt_, cas)
             wtal_pred_dict[vid_name[0]] = cas_
             if save:
-                plot_pred(cas_, gt_, vid_name[0]+'_wtal_', savefig_path)
+                plot_pred(cas_, gt_, vid_name[0]+'_wtal_inner_', savefig_path)
             # For Supervision head
             if sup_cas_softmax is not None:
                 cas = sup_cas_softmax
                 cas_ = utils.get_cas(gt_, cas)
                 sup_pred_dict[vid_name[0]] = cas_
                 if save:
-                    plot_pred(cas_, gt_, vid_name[0]+'_sup_', savefig_path)
+                    plot_pred(cas_, gt_, vid_name[0]+'_inner_seg_', savefig_path)
+
+        if save:
+            plot_node(nodes_lst, nodes_label_lst, class_lst, os.path.abspath(config.output_path))
 
         test_acc = num_correct / num_total
 
-        json_path = os.path.join(config.output_path, 'result.json')
+        json_path = os.path.join(config.output_path, 'inner_result.json')
         with open(json_path, 'w') as f:
             json.dump(final_res, f)
             f.close()
@@ -216,11 +240,11 @@ def test(net, config, logger, test_loader, test_info, step, gt,
 
         if save:
             file_to_write = open(os.path.join(config.output_path,
-                                              '{}_wtal_pred_25.pickle'.format(config.test_dataset)), 'wb')
+                                              '{}_wtal_inner_pred_25.pickle'.format(config.test_dataset)), 'wb')
             pickle.dump(wtal_pred_dict, file_to_write)
             if sup_cas_softmax is not None:
                 file_to_write = open(os.path.join(config.output_path,
-                                              '{}_sup_pred_25.pickle'.format(config.test_dataset)), 'wb')
+                                              '{}_sup_inner_pred_25.pickle'.format(config.test_dataset)), 'wb')
                 pickle.dump(sup_pred_dict, file_to_write)
         
     return sup_pred_dict

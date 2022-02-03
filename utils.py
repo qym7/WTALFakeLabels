@@ -299,6 +299,7 @@ def group_node(x, gt, thres1=0.2, thres2=0.4):
     nodes = []
     nodes_label = []
     nodes_pos = []
+    vid_label = []
     for i, (feat, gt_vid) in enumerate(zip(x.detach().cpu().numpy(), x_label)):  # 迭代循环一类下的N个视频，由于每个视频产生的节点数不同，只能通过循环处理
         split_pos = np.where(np.diff(gt_vid) != 0)[0] + 1
         split_gt = np.split(gt_vid, split_pos)
@@ -308,11 +309,12 @@ def group_node(x, gt, thres1=0.2, thres2=0.4):
             nodes_label.append(split_gt[j].mean())
             node = split_x[j].mean(axis=0)
             nodes.append(node)
+            vid_label.append(i)
             if j < len(split_pos):
                 nodes_pos.append((i, bg_pos, bg_pos+len(split_x[j])))
                 bg_pos += len(split_x[j])
             else:
-                nodes_pos.append((i, bg_pos, 750))
-                bg_pos = 750
+                nodes_pos.append((i, bg_pos, gt.shape[-1]))
+                bg_pos = gt.shape[-1]
 
-    return np.stack(nodes), np.stack(nodes_label), nodes_pos
+    return np.stack(nodes), np.stack(nodes_label), nodes_pos, vid_label

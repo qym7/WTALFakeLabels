@@ -62,7 +62,8 @@ if __name__ == "__main__":
     test_loader = data.DataLoader(
         ThumosFeature(data_path=config.data_path, mode=config.test_dataset,
                         modal=config.modal, feature_fps=config.feature_fps,
-                        num_segments=config.num_segments, supervision='weak',
+                        num_segments=config.num_segments, supervision=config.supervision,
+                        supervision_path=config.supervision_path,
                         seed=config.seed, sampling='uniform'),
             batch_size=1,
             shuffle=False, num_workers=config.num_workers,
@@ -95,11 +96,12 @@ if __name__ == "__main__":
 
     optimizer = torch.optim.Adam(net.parameters(), lr=config.lr[0],
         betas=(0.9, 0.999), weight_decay=0.0005)
-    optimizer_gcnn = torch.optim.Adam(gcnn.parameters(), lr=0.01,
+    optimizer_gcnn = torch.optim.Adam(gcnn.parameters(), lr=config.lr[0],
         betas=(0.9, 0.999), weight_decay=0.0005)
 
     logger = Logger(config.log_path)
 
+    nodes_dict = {}
     for step in tqdm(
             range(1, config.num_iters + 1),
             total = config.num_iters,
@@ -113,13 +115,16 @@ if __name__ == "__main__":
             loader_iter = iter(train_loader)
 
         train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterion_gcnn, logger, step,
-              net_teacher, config.m)
+              net_teacher, config.m, nodes_dict)
 
-        sup_pred_dict = test(net, config, logger, test_loader, test_info, step, gt,
+        sup_pred_dict = test(net, gcnn, config, logger, test_loader, test_info, step, gt,
                         cls_thres=cls_thres, save=False)
 
         iou = [test_info['mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1])][-1] for thres in cls_thres]
 
+
+        # if step % 100 == 0:
+        #     train_loader.temp_annots = sup_pred_dict
         # # update pseudo-labels
         # if bool(config.dynamic):
         #     if step % 1000 == 0:

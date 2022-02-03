@@ -7,62 +7,6 @@ import scipy.sparse as sp
 from utils import *
 
 
-class CAS_Module(nn.Module):
-    def __init__(self, len_feature, num_classes, self_train):
-        super(CAS_Module, self).__init__()
-        self.len_feature = len_feature
-        self.self_train = self_train
-        self.conv = nn.Sequential(
-            nn.Conv1d(in_channels=self.len_feature, out_channels=2048, kernel_size=3,
-                      stride=1, padding=1),
-            nn.ReLU()
-        )
-
-        self.classifier = nn.Sequential(
-            nn.Conv1d(in_channels=2048, out_channels=num_classes, kernel_size=1,
-                      stride=1, padding=0, bias=False)
-        )
-        # Dropout rate changing point, default 0.7
-        self.drop_out = nn.Dropout(p=0.7)
-
-        if self.self_train:
-            self.sup_classifier = nn.Sequential(
-                nn.Conv1d(in_channels=2048, out_channels=num_classes, kernel_size=1,
-                        stride=1, padding=0, bias=False)
-            )
-            # Dropout rate changing point, default 0.7
-            self.sup_drop_out = nn.Dropout(p=0.9)
-            self.mlp = nn.Sequential(
-                        nn.Linear(num_classes, num_classes),
-                        nn.ReLU(),
-                        nn.Dropout(0.1),
-                        nn.Linear(num_classes, num_classes),
-                        nn.ReLU(),
-                        nn.Dropout(0.5),
-                        nn.Linear(num_classes, num_classes)
-            )
-
-    def forward(self, x):
-        # x: (B, T, F)
-        out = x.permute(0, 2, 1)
-        # out: (B, F, T)
-        out = self.conv(out)
-        features = out.permute(0, 2, 1)
-        out = self.drop_out(out)
-        out = self.classifier(out)
-        out = out.permute(0, 2, 1)
-        # out: (B, T, C)
-        sup_out = None
-        if self.self_train:
-            sup_out = self.sup_drop_out(features.permute(0, 2, 1))
-            sup_out = self.sup_classifier(sup_out)
-            sup_out = sup_out.permute(0, 2, 1)
-            # sup_out = self.mlp(sup_out)
-            # sup_out = self.mlp(out)
-            return out, features, sup_out
-        return out, features, sup_out
-
-
 class GraphConvolution(nn.Module):
     '''
     Reference: https://www.cnblogs.com/foghorn/p/15240260.html
@@ -85,7 +29,7 @@ class GraphConvolution(nn.Module):
 
     def forward(self, input_features, adj):
         support = torch.mm(input_features, self.weight)  # 同weight相乘
-        support = input_features
+        # support = input_features
         output = torch.spmm(adj, support)  # 同adj mat相乘
         # print(output)
         if self.use_bias:
@@ -113,9 +57,9 @@ class GCN_Module(nn.Module):
 
     def forward(self, X, adj):
         adj = self.get_adj(adj).cuda()
-        # X = F.relu(self.gcn1(X, adj))
-        # X = self.gcn2(X, adj)
-        X = self.gcn1(X, adj)
+        X = F.relu(self.gcn1(X, adj))
+        X = self.gcn2(X, adj)
+        # X = self.gcn1(X, adj)
 
         return X
 
@@ -127,28 +71,96 @@ class GCN(nn.Module):
     def __init__(self):
         super(GCN, self).__init__()
         self.gcn_module = GCN_Module()
+        self.old_nodes_dict = {}
 
-    def forward(self, x, gt, index):
+    def forward(self, x, gt, index, eval=True):
         nodes = []
         nodes_label = []
+        vids_label = []
         new_x = torch.zeros_like(x)
         for i in range(len(x)):  # bs * N * T * 20, bs也意味着有bs类的视频，每类视频有N个
             vid_cls = x[i]
             gt_cls = gt[i, :, :, index[i]]  # N * T
-            nodes_, nodes_label_, nodes_pos_ = group_node(vid_cls, gt_cls)  # 由于只有在同类视频里产生节点图，所以需要迭代循环所有类
+            nodes_, nodes_label_, nodes_pos_, vid_label_ = group_node(vid_cls, gt_cls)  # 由于只有在同类视频里产生节点图，所以需要迭代循环所有类
             adj = generate_adj_matrix(nodes_label_)
             # pass to GCN
             x_ = self.gcn_module(torch.from_numpy(nodes_).detach().cuda(), adj)  # 根据gcn处理后的node和node在特征中的位置更新features
             for j, pos in enumerate(nodes_pos_):
                 new_x[i, pos[0], pos[1]:pos[2]] = x_[j].repeat(pos[2]-pos[1], 1)
             nodes.append(x_)  # 产生N个同类视频的节点
-
+            vids_label.append(torch.Tensor(vid_label_))
             nodes_label.append(torch.from_numpy(nodes_label_).cuda())  # 产生上述节点对应标签，1为action，0为bkg，-1为不确定
 
-        gt = gt.reshape(-1, gt.shape[-2], gt.shape[-1])
         new_x = new_x.reshape(-1, x.shape[-2], x.shape[-1])
 
-        return new_x, gt, nodes, nodes_label
+        return new_x, nodes, nodes_label, vids_label
+
+
+class CAS_Module(nn.Module):
+    def __init__(self, len_feature, num_classes, self_train):
+        super(CAS_Module, self).__init__()
+        self.len_feature = len_feature
+        self.self_train = self_train
+        self.conv = nn.Sequential(
+            nn.Conv1d(in_channels=self.len_feature, out_channels=2048, kernel_size=3,
+                      stride=1, padding=1),
+            nn.ReLU()
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Conv1d(in_channels=2048, out_channels=num_classes, kernel_size=1,
+                      stride=1, padding=0, bias=False)
+        )
+        # Dropout rate changing point, default 0.7
+        # self.classifier = nn.Sequential(
+        #                 nn.Linear(2048, 512),
+        #                 nn.ReLU(),
+        #                 nn.Dropout(0.1),
+        #                 nn.Linear(512, 128),
+        #                 nn.ReLU(),
+        #                 nn.Dropout(0.5),
+        #                 nn.Linear(128, 20)
+        #     )
+        self.drop_out = nn.Dropout(p=0.7)
+
+        if self.self_train:
+            self.sup_classifier = nn.Sequential(
+                nn.Conv1d(in_channels=2048, out_channels=num_classes, kernel_size=1,
+                        stride=1, padding=0, bias=False)
+            )
+            # Dropout rate changing point, default 0.7
+            self.sup_drop_out = nn.Dropout(p=0.9)
+            self.mlp = nn.Sequential(
+                        nn.Linear(num_classes, num_classes),
+                        nn.ReLU(),
+                        nn.Dropout(0.1),
+                        nn.Linear(num_classes, num_classes),
+                        nn.ReLU(),
+                        nn.Dropout(0.5),
+                        nn.Linear(num_classes, num_classes)
+            )
+
+    def forward(self, x):
+        # x: (B, T, F)
+        # conv version to deremark
+        out = x.permute(0, 2, 1)
+        # out: (B, F, T)
+        out = self.conv(out)
+        features = out.permute(0, 2, 1)
+        out = self.drop_out(out)
+        out = self.classifier(out)
+        out = out.permute(0, 2, 1)
+
+        # out: (B, T, C)
+        sup_out = None
+        if self.self_train:
+            sup_out = self.sup_drop_out(features.permute(0, 2, 1))
+            sup_out = self.sup_classifier(sup_out)
+            sup_out = sup_out.permute(0, 2, 1)
+            # sup_out = self.mlp(sup_out)
+            # sup_out = self.mlp(out)
+            return out, features, sup_out
+        return out, features, sup_out
 
 
 class Model(nn.Module):

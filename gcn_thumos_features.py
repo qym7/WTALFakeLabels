@@ -158,6 +158,10 @@ class GCNThumosFeature(data.Dataset):
     def random_perturb(self, length):
         if self.num_segments == length:
             return np.arange(self.num_segments).astype(int)
+        ######################## ema code to be deleted
+        samples = np.arange(self.num_segments) * length / self.num_segments
+        return np.floor(samples).astype(int)
+        ########################
         samples = np.arange(self.num_segments) * length / self.num_segments
         for i in range(self.num_segments):
             if i < self.num_segments - 1:
