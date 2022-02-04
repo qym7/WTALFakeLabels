@@ -50,21 +50,23 @@ if __name__ == "__main__":
                         config.supervision!='weak')
         net_teacher = net_teacher.cuda()
 
-    train_loader = data.DataLoader(
-        GCNThumosFeature(data_path=config.data_path, mode='train',
+    train_set = GCNThumosFeature(data_path=config.data_path, mode='train',
                         modal=config.modal, feature_fps=config.feature_fps,
                         num_segments=config.num_segments, supervision=config.supervision,
                         supervision_path=config.supervision_path,
-                        seed=config.seed, sampling='random', N=config.N),
+                        seed=config.seed, sampling='random', N=config.N)
+    train_loader = data.DataLoader(
+            train_set,
             batch_size=config.batch_size,
             shuffle=True, num_workers=config.num_workers,
             worker_init_fn=worker_init_fn)
-    test_loader = data.DataLoader(
-        ThumosFeature(data_path=config.data_path, mode=config.test_dataset,
+    test_set = ThumosFeature(data_path=config.data_path, mode=config.test_dataset,
                         modal=config.modal, feature_fps=config.feature_fps,
                         num_segments=config.num_segments, supervision=config.supervision,
                         supervision_path=config.supervision_path,
-                        seed=config.seed, sampling='uniform'),
+                        seed=config.seed, sampling='uniform')
+    test_loader = data.DataLoader(
+            test_set,
             batch_size=1,
             shuffle=False, num_workers=config.num_workers,
             worker_init_fn=worker_init_fn)
@@ -107,6 +109,7 @@ if __name__ == "__main__":
             total = config.num_iters,
             dynamic_ncols = True
         ):
+
         if step > 1 and config.lr[step - 1] != config.lr[step - 2]:
             for param_group in optimizer.param_groups:
                 param_group["lr"] = config.lr[step - 1]
@@ -122,9 +125,15 @@ if __name__ == "__main__":
 
         iou = [test_info['mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1])][-1] for thres in cls_thres]
 
+        # if step % 20 == 0:
+        #     for vid_name in train_set.temp_annots:
+        #         train_set.temp_annots[vid_name] = sup_pred_dict[vid_name]
+        #     train_loader = data.DataLoader(
+        #                     train_set,
+        #                     batch_size=config.batch_size,
+        #                     shuffle=True, num_workers=config.num_workers,
+        #                     worker_init_fn=worker_init_fn)
 
-        # if step % 100 == 0:
-        #     train_loader.temp_annots = sup_pred_dict
         # # update pseudo-labels
         # if bool(config.dynamic):
         #     if step % 1000 == 0:
@@ -140,7 +149,6 @@ if __name__ == "__main__":
         #                             config.r_act, config.r_bkg,
         #                             config.supervision!='weak')
         #             net_teacher = net_teacher.cuda()
-
         #         optimizer = torch.optim.Adam(net.parameters(), lr=config.lr[0],
         #                                     betas=(0.9, 0.999), weight_decay=0.0005)
 

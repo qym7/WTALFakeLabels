@@ -13,12 +13,15 @@ class GCNN_loss(nn.Module):
         self.gcnn_weight = gcnn_weight
 
     def contrastive_loss(self, node, pos_nodes, neg_nodes):
-        pos_sim = torch.norm(pos_nodes - node, p=2, dim=1)
-        neg_sim = torch.norm(neg_nodes - node, p=2, dim=1)
+        similarity = nn.CosineSimilarity(dim=1)
+        pos_sim = similarity(pos_nodes, node.unsqueeze(dim=0))
+        neg_sim = similarity(neg_nodes, node.unsqueeze(dim=0))
+        # pos_sim = torch.norm(pos_nodes - node, p=2, dim=1)
+        # neg_sim = torch.norm(neg_nodes - node, p=2, dim=1)
         pos_loss = torch.tensor(0).cuda()
         neg_loss = torch.tensor(0).cuda()
-        # 在这里更改similarity的格式
         similarity = nn.CosineSimilarity(dim=0)
+        # 在这里更改similarity的格式
         if pos_nodes.shape[0] != 0:
             # print('pos', torch.argmax(pos_sim), torch.max(nn.functional.gumbel_softmax(pos_sim)))
             pos_sample = pos_nodes[torch.argmax(pos_sim).detach()]
@@ -28,7 +31,7 @@ class GCNN_loss(nn.Module):
             # print('neg', torch.argmax(neg_sim),  torch.max(nn.functional.gumbel_softmax(neg_sim)))
             # neg_sample = torch.matmul(nn.functional.gumbel_softmax(-neg_sim), neg_nodes)  # choose most similar negetive sample
             neg_sample = neg_nodes[torch.argmin(neg_sim).detach()]
-            neg_loss = similarity(node, neg_sample)
+            neg_loss = 1 + similarity(node, neg_sample)
 
         return pos_loss + neg_loss
 
@@ -213,21 +216,10 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterio
     _gt = _gt.cuda()  # reshaped in net
     _label = _label.reshape(-1, _label.shape[-1]).cuda()
 
+    # new_data, nodes, nodes_label, vids_label = gcnn(_data, _gt, index, vid_names)
+    # _data = (_data.reshape(-1, _data.shape[-2], _data.shape[-1]).detach() + new_data) / 2
     _data, nodes, nodes_label, vids_label = gcnn(_data, _gt, index, vid_names)
     cost_gcnn = criterion_gcnn(nodes, nodes_label)
-
-    ######################## ema code to be deleted
-    for i in range(len(nodes)):
-        class_node = nodes[i]
-        vid_label = vids_label[i]
-        for j in range(N):
-            vid_cls_name = vid_names[i][j]+f'_{index[i]}'
-            if vid_cls_name not in nodes_dict:
-                nodes_dict[vid_cls_name] = nodes[i][vid_label==j].detach()
-            else:
-                nodes[i][vid_label==j] = nodes[i][vid_label==j] * 0.01 + nodes_dict[vid_cls_name] * 0.99
-                nodes_dict[vid_cls_name] = nodes[i][vid_label==j].detach()
-    ########################
 
     _data = _data.detach()
     _gt = _gt.reshape(-1, _gt.shape[-2], _gt.shape[-1]).detach()
@@ -240,7 +232,8 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterio
 
     optimizer.zero_grad()
     optimizer_gcnn.zero_grad()
-    cost_gcnn.backward()
+    # cost_gcnn.backward()
+    cost = cost + cost_gcnn
     cost.backward()
     optimizer.step()
     optimizer_gcnn.step()

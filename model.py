@@ -71,7 +71,6 @@ class GCN(nn.Module):
     def __init__(self):
         super(GCN, self).__init__()
         self.gcn_module = GCN_Module()
-        self.old_nodes_dict = {}
 
     def forward(self, x, gt, index, eval=True):
         nodes = []
@@ -86,7 +85,7 @@ class GCN(nn.Module):
             # pass to GCN
             x_ = self.gcn_module(torch.from_numpy(nodes_).detach().cuda(), adj)  # 根据gcn处理后的node和node在特征中的位置更新features
             for j, pos in enumerate(nodes_pos_):
-                new_x[i, pos[0], pos[1]:pos[2]] = x_[j].repeat(pos[2]-pos[1], 1)
+                new_x[i, pos[0], pos[1]:pos[2]] = x_[j].repeat(pos[2]-pos[1], 1).clone()
             nodes.append(x_)  # 产生N个同类视频的节点
             vids_label.append(torch.Tensor(vid_label_))
             nodes_label.append(torch.from_numpy(nodes_label_).cuda())  # 产生上述节点对应标签，1为action，0为bkg，-1为不确定
