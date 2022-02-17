@@ -64,19 +64,40 @@ class GCNThumosFeature(data.Dataset):
     def __getitem__(self, index):
         v_index = np.random.choice(self.label_group[index], self.N)  # 随机选取index类别中的self.N个视频
         data = []
+        nodes = []
+        nodes_label = []
+        nodes_pos = []
         label = []
         temp_anno = []
         vid_name = []
         vid_num_seg = []
-        for idx in v_index:
+        for i, idx in enumerate(v_index):
             data_, label_, temp_anno_, vid_name_, vid_num_seg_ = self.get_single_item(idx)
+            # nodes_, nodes_label_, nodes_pos_ = self.get_nodes(data_, temp_anno_[:, index])
             data.append(data_)
+            # nodes.append(nodes_)
+            # nodes_label.append(nodes_label_)
+            # nodes_pos.append(nodes_pos_ + i*750)
             label.append(label_)
             temp_anno.append(temp_anno_)
             vid_name.append(vid_name_)
             vid_num_seg.append(vid_num_seg_)
 
-        return np.stack(data), np.stack(label), np.stack(temp_anno), vid_name, vid_num_seg, index
+        # nodes = np.concatenate(nodes)
+        # nodes_label = np.concatenate(nodes_label)
+        # nodes_pos = np.concatenate(nodes_pos)
+        # nodes_nbr = len(nodes)
+
+        # nodes = np.concatenate([nodes, np.zeros((3000 - nodes_nbr, nodes.shape[-1]))])
+        # nodes_label = np.concatenate([nodes_label, -10 * np.ones(3000 - nodes_nbr)])
+        # nodes_pos = np.concatenate([nodes_pos, -1 * np.ones((3000 - nodes_nbr, 2))])
+
+        return np.concatenate(data), nodes, nodes_label, nodes_pos.astype(int), nodes_nbr, \
+               np.stack(label), np.stack(temp_anno), vid_name, vid_num_seg, index
+
+    def get_nodes(self, data, gt):
+        nodes, nodes_label, nodes_pos = utils.group_node(data, gt)
+        return nodes, nodes_label, nodes_pos
 
     def get_single_item(self, index):
         data, vid_num_seg, sample_idx = self.get_data(index)
@@ -182,3 +203,17 @@ class GCNThumosFeature(data.Dataset):
         samples = np.arange(self.num_segments) * length / self.num_segments
         samples = np.floor(samples)
         return samples.astype(int)
+
+    def regenerate(self, new_pseudo_labels, update_method='ema'):
+        '''
+        Update current pseudolabels through new_pseudo_labels
+        '''
+        for vid_name in self.temp_annots:
+            if update_method == 'ema':
+                self.temp_annots[vid_name] =  new_pseudo_labels[vid_name] * 0.01 + \
+                    self.temp_annots[vid_name] + 0.99
+            else:
+                self.temp_annots[vid_name] = new_pseudo_labels
+                
+        
+    

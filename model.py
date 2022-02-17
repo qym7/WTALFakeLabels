@@ -29,9 +29,7 @@ class GraphConvolution(nn.Module):
 
     def forward(self, input_features, adj):
         support = torch.mm(input_features, self.weight)  # 同weight相乘
-        # support = input_features
         output = torch.spmm(adj, support)  # 同adj mat相乘
-        # print(output)
         if self.use_bias:
             return output + self.bias
         else:
@@ -49,7 +47,7 @@ class GCN_Module(nn.Module):
 
     def get_adj(self, adj):
         adj = sp.csr_matrix(adj)
-        # adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
+        adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
         adj = normalize(adj + sp.eye(adj.shape[0]))
         adj = sparse_mx_to_torch_sparse_tensor(adj)
 
@@ -59,7 +57,6 @@ class GCN_Module(nn.Module):
         adj = self.get_adj(adj).cuda()
         X = F.relu(self.gcn1(X, adj))
         X = self.gcn2(X, adj)
-        # X = self.gcn1(X, adj)
 
         return X
 
@@ -72,28 +69,57 @@ class GCN(nn.Module):
         super(GCN, self).__init__()
         self.gcn_module = GCN_Module()
 
-    def forward(self, x, gt, index, eval=True):
-        nodes = []
-        nodes_label = []
-        vids_label = []
-        new_x = torch.zeros_like(x)
-        for i in range(len(x)):  # bs * N * T * 20, bs也意味着有bs类的视频，每类视频有N个
-            vid_cls = x[i]
-            gt_cls = gt[i, :, :, index[i]]  # N * T
-            nodes_, nodes_label_, nodes_pos_, vid_label_ = group_node(vid_cls, gt_cls)  # 由于只有在同类视频里产生节点图，所以需要迭代循环所有类
-            adj = generate_adj_matrix(nodes_label_)
-            # pass to GCN
-            x_ = self.gcn_module(torch.from_numpy(nodes_).detach().cuda(), adj)  # 根据gcn处理后的node和node在特征中的位置更新features
-            for j, pos in enumerate(nodes_pos_):
-                new_x[i, pos[0], pos[1]:pos[2]] = x_[j].repeat(pos[2]-pos[1], 1).clone()
-            nodes.append(x_)  # 产生N个同类视频的节点
-            vids_label.append(torch.Tensor(vid_label_))
-            nodes_label.append(torch.from_numpy(nodes_label_).cuda())  # 产生上述节点对应标签，1为action，0为bkg，-1为不确定
+    def get_adj_matrix(self, tensor_nodes_label):
+        nodes_label = tensor_nodes_label.detach().cpu().numpy()
+        diff_edges = np.where(np.abs(np.diff(nodes_label)) == 1)[0]  # bkg和uncertain, act和uncertain之间的边
+        diff_edges = list(product(diff_edges, diff_edges+1))
+        act_edges = np.where(nodes_label == 2)[0]  # act之间的边
+        act_edges = list(product(act_edges, act_edges))
+        bkg_edges = np.where(nodes_label == 0)[0]  # bkg之间的边
+        bkg_edges = list(product(bkg_edges, bkg_edges))
+        adj_cls = np.zeros((len(nodes_label), len(nodes_label)))
+        adj_unc = np.zeros((len(nodes_label), len(nodes_label)))
+        if len(diff_edges) > 0:
+            np.add.at(adj_unc, tuple(zip(*diff_edges)), 1)
+        np.add.at(adj_cls, tuple(zip(*act_edges)), 1)
+        np.add.at(adj_cls, tuple(zip(*bkg_edges)), 1)
+        np.fill_diagonal(adj_cls, 0)  # 消除act和bkg product中产生的自己指向自己的边，这个自指边在adjacent matrix后续normalize过程中会加上
+        adj_cls = np.logical_or(adj_cls, (adj_cls.T)).astype(float)
+        adj_unc = np.logical_or(adj_unc, (adj_unc.T)).astype(float)
+        
+        return torch.Tensor(adj_cls).cuda(), torch.Tensor(adj_unc).cuda()
 
-        new_x = new_x.reshape(-1, x.shape[-2], x.shape[-1])
+    def update_data(self, poses, nodes, i, updated_data):
+        with torch.no_grad():
+            for j, pos in enumerate(poses):
+                updated_data[i, pos[0]:pos[1]] = nodes[j].repeat((pos[1]-pos[0]).item(), 1)
 
-        return new_x, nodes, nodes_label, vids_label
+    def get_nodes(self, data, gt):
+        with torch.no_grad():
+            nodes, nodes_label, nodes_pos = group_node(data, gt)
+        return nodes, nodes_label, nodes_pos
 
+    def forward(self, data, pseudo_labels, label):
+        updated_nodes = []
+        updated_data = torch.zeros_like(data)
+        for i in range(data.shape[0]):
+            cur_nodes, cur_label, cur_pos = self.get_nodes(data[i],
+                                                           pseudo_labels[:, label[i]])
+            # cur_nodes = nodes[i][:nodes_nbr[i]]
+            # cur_labels = nodes_label[i][:nodes_nbr[i]]
+            # cur_pos = nodes_pos[i][:nodes_nbr[i]]
+            cur_adj_cls, cur_adj_unc = self.get_adj_matrix(cur_labels)
+            # more weight for more dissimilar nodes of the same class
+            # cur_sim = 1 / (1 + sim_matrix(cur_nodes, cur_nodes))
+            cur_sim = sim_matrix(cur_nodes, cur_nodes)
+            cur_adj = cur_adj_cls * cur_sim + cur_adj_unc
+            cur_nodes = cur_nodes.detach().to(torch.float32)
+            updated_nodes.append(self.gcn_module(cur_nodes,
+                                                 cur_adj.detach().cpu().numpy()))
+            self.update_data(cur_pos, cur_nodes, i, updated_data)
+
+        return updated_nodes, updated_data
+        
 
 class CAS_Module(nn.Module):
     def __init__(self, len_feature, num_classes, self_train):
@@ -110,16 +136,7 @@ class CAS_Module(nn.Module):
             nn.Conv1d(in_channels=2048, out_channels=num_classes, kernel_size=1,
                       stride=1, padding=0, bias=False)
         )
-        # Dropout rate changing point, default 0.7
-        # self.classifier = nn.Sequential(
-        #                 nn.Linear(2048, 512),
-        #                 nn.ReLU(),
-        #                 nn.Dropout(0.1),
-        #                 nn.Linear(512, 128),
-        #                 nn.ReLU(),
-        #                 nn.Dropout(0.5),
-        #                 nn.Linear(128, 20)
-        #     )
+
         self.drop_out = nn.Dropout(p=0.7)
 
         if self.self_train:
@@ -153,9 +170,11 @@ class CAS_Module(nn.Module):
         # out: (B, T, C)
         sup_out = None
         if self.self_train:
+            # CNN classifier
             sup_out = self.sup_drop_out(features.permute(0, 2, 1))
             sup_out = self.sup_classifier(sup_out)
             sup_out = sup_out.permute(0, 2, 1)
+            # # MLP classifier
             # sup_out = self.mlp(sup_out)
             # sup_out = self.mlp(out)
             return out, features, sup_out

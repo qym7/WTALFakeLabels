@@ -44,36 +44,32 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
         for i in range(len(test_loader.dataset)):
 
             # GCN inner video merge version
-            _data, _label, _gt, vid_name, vid_num_seg = next(load_iter)
-            _data = _data.reshape(1, 1, _data.shape[-2], _data.shape[-1]).cuda()
-            _gt = _gt.reshape(1, 1, _gt.shape[-2], _gt.shape[-1]).cuda()
-            _label = _label.reshape(-1, _label.shape[-1]).cuda()
+            data, label, pseudo_label, vid_name, vid_num_seg = next(load_iter)
+            gcn_data = torch.zeros_like(data).cuda()
+            # for index in range(pseudo_label.shape[-1]):
+            for index in torch.where(label==1)[0]:
+                # nodes, nodes_label, nodes_pos = utils.group_node(data[0], pseudo_label[0, :, index])
+                # nodes_nbr = [len(nodes)]
+                # nodes = torch.Tensor(nodes).unsqueeze(0).cuda()
+                # nodes_label = torch.Tensor(nodes_label).unsqueeze(0).cuda()
+                # nodes_pos = torch.Tensor(nodes_pos).unsqueeze(0).to(torch.int).cuda()
+                # _, cur_data = gcnn(nodes.cuda(), nodes_label.cuda(),
+                                #    nodes_pos.cuda(), nodes_nbr, data.cuda())
+                _, cur_data = gcnn(data.cuda(), pseudo_label[:, index])
+                gcn_data += cur_data
 
-            new_data = torch.zeros_like(_data.reshape(-1, _data.shape[-2], _data.shape[-1]))
-            for index in torch.where(_label[0]==1)[0]:
-                cur_data, cur_nodes, cur_nodes_label, _ = gcnn(_data, _gt, [index], eval=True)
-                new_data += cur_data
-                nodes_lst.append(torch.stack(cur_nodes)[0].detach().cpu().numpy())
-                nodes_label_lst.append(torch.stack(cur_nodes_label)[0].detach().cpu().numpy())
-                class_lst.append(np.ones(len(cur_nodes[0]))*(index.detach().cpu().item()))
-            _data = new_data/len(torch.where(_label[0]==1)[0])
-            
-            _data = _data.detach()
-            _gt = _gt.detach()
-
-            # # normal version
-            # _data, _label, _, vid_name, vid_num_seg = next(load_iter)
-
-            # _data = _data.cuda()
-            # _label = _label.cuda()
+            gcn_data = gcn_data / pseudo_label.shape[-1]
+            # data = torch.cat([gcn_data, data.cuda()], dim=-1)
+            # data = gcn_data
+            data = data.cuda()
 
             vid_num_seg = vid_num_seg[0].cpu().item()
-            num_segments = _data.shape[1]
-            score_act, _, feat_act, feat_bkg, features, cas_softmax, sup_cas_softmax = net(_data)
+            num_segments = data.shape[1]
+            score_act, _, feat_act, feat_bkg, features, cas_softmax, sup_cas_softmax = net(data)
             feat_magnitudes_act = torch.mean(torch.norm(feat_act, dim=2), dim=1)
             feat_magnitudes_bkg = torch.mean(torch.norm(feat_bkg, dim=2), dim=1)
 
-            label_np = _label.cpu().data.numpy()
+            label_np = label.cpu().data.numpy()
             score_np = score_act[0].cpu().data.numpy()
 
             pred_np = np.zeros_like(score_np)

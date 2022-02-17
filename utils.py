@@ -270,51 +270,43 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     
     return torch.sparse.FloatTensor(indices, values, shape)
 
-def generate_adj_matrix(nodes_label):
-    diff_edges = np.where(np.abs(np.diff(nodes_label)) == 1)[0]  # bkg和uncertain, act和uncertain之间的边
-    diff_edges = list(product(diff_edges, diff_edges+1))
-    act_edges = np.where(nodes_label == 2)[0]  # act之间的边
-    act_edges = list(product(act_edges, act_edges))
-    bkg_edges = np.where(nodes_label == 0)[0]  # bkg之间的边
-    bkg_edges = list(product(bkg_edges, bkg_edges))
-    adj = np.zeros((len(nodes_label), len(nodes_label)))
-    if len(diff_edges) > 0:
-        np.add.at(adj, tuple(zip(*diff_edges)), 1)
-    np.add.at(adj, tuple(zip(*act_edges)), 1)
-    np.add.at(adj, tuple(zip(*bkg_edges)), 1)
-    np.fill_diagonal(adj, 0)  # 消除act和bkg product中产生的自己指向自己的边，这个自指边在adjacent matrix后续normalize过程中会加上
-    adj = np.logical_or(adj, (adj.T)).astype(float)
-    
-    return adj
 
-def group_node(x, gt, thres1=0.2, thres2=0.4):
+def group_node(x, pseudo_label, thres1=0.2, thres2=0.4):
     '''
-    gt: bs * T * 20
-    return:
-    nodes: list of bs elements, 每一个元素是Ni*2048的矩阵，表示N个同类视频中的节点
+    Group nodes for a single video
+    pseudo_label: bs * T * 20
     '''
-    x_label = np.ones_like(gt.detach().cpu().numpy())
-    x_label[gt.detach().cpu().numpy()>thres2] = 2
-    x_label[gt.detach().cpu().numpy()<=thres1] = 0
-    nodes = []
+    x_label = np.ones_like(pseudo_label)
+    x_label[pseudo_label>thres2] = 2
+    x_label[pseudo_label<=thres1] = 0
+
+    split_pos = np.where(np.diff(pseudo_label) != 0)[0] + 1
+    split_gt = np.split(x_label, split_pos)
+    split_x = np.split(x, split_pos)
+    bg_pos = 0
+
     nodes_label = []
     nodes_pos = []
-    vid_label = []
-    for i, (feat, gt_vid) in enumerate(zip(x.detach().cpu().numpy(), x_label)):  # 迭代循环一类下的N个视频，由于每个视频产生的节点数不同，只能通过循环处理
-        split_pos = np.where(np.diff(gt_vid) != 0)[0] + 1
-        split_gt = np.split(gt_vid, split_pos)
-        split_x = np.split(feat, split_pos)
-        bg_pos = 0
-        for j in range(len(split_pos)+1):
-            nodes_label.append(split_gt[j].mean())
-            node = split_x[j].mean(axis=0)
-            nodes.append(node)
-            vid_label.append(i)
-            if j < len(split_pos):
-                nodes_pos.append((i, bg_pos, bg_pos+len(split_x[j])))
-                bg_pos += len(split_x[j])
-            else:
-                nodes_pos.append((i, bg_pos, gt.shape[-1]))
-                bg_pos = gt.shape[-1]
+    nodes = []
 
-    return np.stack(nodes), np.stack(nodes_label), nodes_pos, vid_label
+    for j in range(len(split_pos)+1):
+        nodes_label.append(split_gt[j].mean())
+        nodes.append(split_x[j].mean(axis=0))
+        if j < len(split_pos):
+            nodes_pos.append([bg_pos, bg_pos+len(split_x[j])])
+            bg_pos += len(split_x[j])
+        else:
+            nodes_pos.append([bg_pos, pseudo_label.shape[-1]])
+            bg_pos = pseudo_label.shape[-1]
+
+    return np.stack(nodes), np.stack(nodes_label), np.stack(nodes_pos)
+
+def sim_matrix(a, b, eps=1e-8):
+    """
+    added eps for numerical stability
+    """
+    a_n, b_n = a.norm(dim=1)[:, None], b.norm(dim=1)[:, None]
+    a_norm = a / torch.clamp(a_n, min=eps)
+    b_norm = b / torch.clamp(b_n, min=eps)
+    sim_mt = torch.mm(a_norm, b_norm.transpose(0, 1))
+    return sim_mt
