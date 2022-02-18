@@ -93,8 +93,10 @@ class GCNThumosFeature(data.Dataset):
             for _anno in anno_list:
                 label_idx = self.class_name_to_idx[_anno['label']]
                 label[label_idx] = 1
-                all_labels.append(label)
-                label_group[label_idx].append(i)
+                if i not in label_group[label_idx]:
+                    label_group[label_idx].append(i)
+            all_labels.append(label)
+
         return all_labels, label_group
 
     def get_data(self, index):

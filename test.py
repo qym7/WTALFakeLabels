@@ -50,14 +50,14 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
                                                 pseudo_label.shape[1], pseudo_label.shape[2])
             gcn_data = torch.zeros_like(data).cuda()
             # for index in range(pseudo_label.shape[-1]):
-            for index in torch.where(label==1)[0]:
+            for index in torch.where(label==1)[1]:
                 _, cur_data, _ = gcnn(data.cuda(), pseudo_label, [index])
                 gcn_data += cur_data
 
-            gcn_data = gcn_data / pseudo_label.shape[-1]
+            gcn_data = gcn_data / len(torch.where(label==1)[1])
             # data = torch.cat([gcn_data, data.cuda()], dim=-1)
             # data = gcn_data
-            data = data.reshape(-1, data.shape[-2], data.shape[-1]).cuda()
+            data = gcn_data.reshape(-1, data.shape[-2], data.shape[-1]).cuda()
 
             vid_num_seg = vid_num_seg[0].cpu().item()
             num_segments = data.shape[1]
@@ -168,7 +168,6 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
             plot_node(nodes_lst, nodes_label_lst, class_lst, os.path.abspath(config.output_path))
 
         test_acc = num_correct / num_total
-
         json_path = os.path.join(config.output_path, 'inner_result.json')
         with open(json_path, 'w') as f:
             json.dump(final_res, f)
