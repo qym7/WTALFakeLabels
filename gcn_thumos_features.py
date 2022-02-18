@@ -70,13 +70,18 @@ class GCNThumosFeature(data.Dataset):
         vid_num_seg = []
         for i, idx in enumerate(v_index):
             data_, label_, temp_anno_, vid_name_, vid_num_seg_ = self.get_single_item(idx)
-            data.append(data_)
-            label.append(label_)
-            temp_anno.append(temp_anno_)
+            label_ = np.zeros([self.num_classes], dtype=np.float32)
+            label_[index] = 1
+            data.append(torch.Tensor(data_))
+            label.append(torch.Tensor(label_))
+            temp_anno.append(torch.Tensor(temp_anno_))
             vid_name.append(vid_name_)
             vid_num_seg.append(vid_num_seg_)
 
-        return np.stack(data), np.stack(label), np.stack(temp_anno), vid_name, vid_num_seg, index
+        return torch.stack(data).to(torch.float32), \
+               torch.stack(label).to(torch.float32), \
+               torch.stack(temp_anno).to(torch.float32), \
+               vid_name, vid_num_seg, index
 
     def get_single_item(self, index):
         data, vid_num_seg, sample_idx = self.get_data(index)

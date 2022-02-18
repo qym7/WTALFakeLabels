@@ -45,19 +45,19 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
 
             # GCN inner video merge version
             data, label, pseudo_label, vid_name, vid_num_seg = next(load_iter)
+            data = net.forward_conv(data.to(torch.float32).cuda())
             data = data.reshape(1, data.shape[0], data.shape[1], data.shape[2])
             pseudo_label = pseudo_label.reshape(1, pseudo_label.shape[0],
                                                 pseudo_label.shape[1], pseudo_label.shape[2])
             gcn_data = torch.zeros_like(data).cuda()
-            # for index in range(pseudo_label.shape[-1]):
+
             for index in torch.where(label==1)[1]:
                 _, cur_data, _ = gcnn(data.cuda(), pseudo_label, [index])
                 gcn_data += cur_data
 
             gcn_data = gcn_data / len(torch.where(label==1)[1])
-            # data = torch.cat([gcn_data, data.cuda()], dim=-1)
-            # data = gcn_data
-            data = gcn_data.reshape(-1, data.shape[-2], data.shape[-1]).cuda()
+            data = torch.cat([gcn_data, data.cuda()], dim=-1)
+            data = data.reshape(-1, data.shape[-2], data.shape[-1]).cuda()
 
             vid_num_seg = vid_num_seg[0].cpu().item()
             num_segments = data.shape[1]
@@ -169,9 +169,15 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
 
         test_acc = num_correct / num_total
         json_path = os.path.join(config.output_path, 'inner_result.json')
-        with open(json_path, 'w') as f:
-            json.dump(final_res, f)
-            f.close()
+        try:
+            with open(json_path, 'w') as f:
+                json.dump(final_res, f)
+                f.close()
+        except:
+            print('final_res', final_res)
+            print('test_acc', test_acc)
+            import pdb
+            pdb.set_trace()
 
         tIoU_thresh = np.linspace(0.1, 0.7, 7)
         anet_detection = ANETdetection(config.gt_path,

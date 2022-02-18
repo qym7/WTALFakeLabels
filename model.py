@@ -143,7 +143,7 @@ class CAS_Module(nn.Module):
         )
 
         self.classifier = nn.Sequential(
-            nn.Conv1d(in_channels=2048, out_channels=num_classes, kernel_size=1,
+            nn.Conv1d(in_channels=2*2048, out_channels=num_classes, kernel_size=1,
                       stride=1, padding=0, bias=False)
         )
 
@@ -151,7 +151,7 @@ class CAS_Module(nn.Module):
 
         if self.self_train:
             self.sup_classifier = nn.Sequential(
-                nn.Conv1d(in_channels=2048, out_channels=num_classes, kernel_size=1,
+                nn.Conv1d(in_channels=2*2048, out_channels=num_classes, kernel_size=1,
                         stride=1, padding=0, bias=False)
             )
             # Dropout rate changing point, default 0.7
@@ -168,11 +168,8 @@ class CAS_Module(nn.Module):
 
     def forward(self, x):
         # x: (B, T, F)
-        # conv version to deremark
-        out = x.permute(0, 2, 1)
-        # out: (B, F, T)
-        out = self.conv(out)
-        features = out.permute(0, 2, 1)
+        features = x
+        out = features.permute(0, 2, 1)
         out = self.drop_out(out)
         out = self.classifier(out)
         out = out.permute(0, 2, 1)
@@ -210,8 +207,16 @@ class Model(nn.Module):
 
         self.drop_out = nn.Dropout(p=0.7)
 
+    def forward_conv(self, x):
+        out = x.permute(0, 2, 1)
+        # out: (B, F, T)
+        out = self.cas_module.conv(out)
+        features = out.permute(0, 2, 1)
+        return features
+
     def forward(self, x):
         x = x.reshape(-1, x.shape[-2], x.shape[-1])
+
         num_segments = x.shape[1]
         k_act = num_segments // self.r_act
         k_bkg = num_segments // self.r_bkg

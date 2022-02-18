@@ -11,15 +11,22 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterio
     net.train()
 
     data, label, pseudo_label, vid_names, _, index = next(loader_iter)
-    data = data.cuda()
+    data = data.reshape(-1, data.shape[-2], data.shape[-1]).cuda()
+
+    # Get features after the convolution layer
+    data = net.forward_conv(data)
+
+    # Calculate GCNN features
+    data = data.reshape(pseudo_label.shape[0],
+                        pseudo_label.shape[1],
+                        data.shape[-2],
+                        data.shape[-1])
     label = label.cuda()
     pseudo_label = pseudo_label.cuda()
-    data_1 = data.clone()
-
-    # Calculate GCNN contrastive loss
     nodes, gcn_data, nodes_label = gcnn(data, pseudo_label, index)
+    
+    # Calculate GCNN loss and back propagate
     cost_gcnn = criterion_gcnn(nodes, nodes_label)
-
     optimizer_gcnn.zero_grad()
     cost_gcnn.backward()
     optimizer_gcnn.step()
@@ -28,12 +35,10 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterio
     label = label.reshape(-1, label.shape[-1]).detach()
     pseudo_label = pseudo_label.reshape(label.shape[0], -1,
                                         pseudo_label.shape[-1]).detach()
-    # data = torch.cat([gcn_data, data], dim=-1)
-    # print(data)
-    data = gcn_data.reshape(label.shape[0], -1, data.shape[-1]).detach()
-    # data = gcn_data.reshape(label.shape[0], -1, data.shape[-1]).detach()
+    data = torch.cat([gcn_data, data], dim=-1)
+    data = data.reshape(label.shape[0], -1, data.shape[-1]).detach()
 
-    # Calculate WTAL loss
+    # Calculate WTAL results and calculate loss
     score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax = net(data)
 
     cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, label,
