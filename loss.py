@@ -11,7 +11,7 @@ class GCNN_loss(nn.Module):
         self.gcnn_weight = gcnn_weight
         self.loss = ContrastiveLoss(0.5)
 
-    def construct_pairs(self, nodes, nodes_label, nodes_nbr):
+    def construct_pairs(self, nodes, nodes_label):
         # ignore the gradient caused by following instructions
         nodes = torch.cat(nodes)
         with torch.no_grad():
@@ -20,9 +20,9 @@ class GCNN_loss(nn.Module):
                 labels = nodes_label[i]
                 labels[labels==2] = labels[labels==2] + i 
                 nodes_label[i] = labels
-            node_mask = (nodes_label!=1) & (nodes_label>=0)
-            nodes_label = torch.cat([nodes_label[i][node_mask[i]]
-                                       for i in range(len(nodes_label))])
+            nodes_label = torch.cat(nodes_label)
+            node_mask = nodes_label!=1
+            nodes_label = nodes_label[node_mask]
             # find pairs
             similarity_matrix = utils.sim_matrix(nodes, nodes)
             # mask all pairs of different classes
@@ -37,8 +37,8 @@ class GCNN_loss(nn.Module):
 
         return nodes, pair_nodes, nodes_label, mask
 
-    def forward(self, nodes, nodes_label, nodes_nbr):
-        nodes, pair_nodes, nodes_label, mask = self.construct_pairs(nodes, nodes_label, nodes_nbr)
+    def forward(self, nodes, nodes_label):
+        nodes, pair_nodes, nodes_label, mask = self.construct_pairs(nodes, nodes_label)
         loss = self.loss(nodes, pair_nodes, nodes_label, mask)
 
         return loss * self.gcnn_weight
@@ -59,7 +59,7 @@ class ContrastiveLoss(nn.Module):
 
         similarity_matrix = utils.sim_matrix(nodes, nodes)
         # eliminate nodes of same type
-        denominator = (~mask).int() * torch.exp(similarity_matrix / self.temperature)
+        denominator = ((~mask).int()+1e-4) * torch.exp(similarity_matrix / self.temperature)
         loss_partial = -torch.log(nominator / torch.sum(denominator, dim=1))
         loss = torch.sum(loss_partial) / nodes.shape[0]
 

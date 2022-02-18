@@ -69,8 +69,7 @@ class GCN(nn.Module):
         super(GCN, self).__init__()
         self.gcn_module = GCN_Module()
 
-    def get_adj_matrix(self, tensor_nodes_label):
-        nodes_label = tensor_nodes_label.detach().cpu().numpy()
+    def get_adj_matrix(self, nodes_label):
         diff_edges = np.where(np.abs(np.diff(nodes_label)) == 1)[0]  # bkg和uncertain, act和uncertain之间的边
         diff_edges = list(product(diff_edges, diff_edges+1))
         act_edges = np.where(nodes_label == 2)[0]  # act之间的边
@@ -92,33 +91,44 @@ class GCN(nn.Module):
     def update_data(self, poses, nodes, i, updated_data):
         with torch.no_grad():
             for j, pos in enumerate(poses):
-                updated_data[i, pos[0]:pos[1]] = nodes[j].repeat((pos[1]-pos[0]).item(), 1)
+                updated_data[i, pos[0], pos[1]:pos[2]] = nodes[j].repeat((pos[2]-pos[1]).item(), 1)
 
     def get_nodes(self, data, gt):
-        with torch.no_grad():
-            nodes, nodes_label, nodes_pos = group_node(data, gt)
-        return nodes, nodes_label, nodes_pos
+        nodes = []
+        nodes_label = []
+        nodes_pos = []
+        for j in range(data.shape[0]):
+            nodes_, nodes_label_, nodes_pos_ = group_node(data[j], gt[:, j])
+            nodes.append(nodes_)
+            nodes_label.append(nodes_label_)
+            nodes_pos.append(np.column_stack((np.ones(nodes_.shape[0])*j,
+                                              nodes_pos_)))
 
-    def forward(self, data, pseudo_labels, label):
+        return np.concatenate(nodes), np.concatenate(nodes_label),\
+               np.concatenate(nodes_pos).astype(int)
+
+    def forward(self, data, pseudo_label, index):
         updated_nodes = []
+        nodes_label = []
         updated_data = torch.zeros_like(data)
         for i in range(data.shape[0]):
-            cur_nodes, cur_label, cur_pos = self.get_nodes(data[i],
-                                                           pseudo_labels[:, label[i]])
-            # cur_nodes = nodes[i][:nodes_nbr[i]]
-            # cur_labels = nodes_label[i][:nodes_nbr[i]]
-            # cur_pos = nodes_pos[i][:nodes_nbr[i]]
+            cur_nodes, cur_labels, cur_pos = self.get_nodes(
+                            data[i].detach().cpu().numpy(),
+                            pseudo_label[i, :, :, index[i]].detach().cpu().numpy())
             cur_adj_cls, cur_adj_unc = self.get_adj_matrix(cur_labels)
-            # more weight for more dissimilar nodes of the same class
-            # cur_sim = 1 / (1 + sim_matrix(cur_nodes, cur_nodes))
+            cur_nodes = torch.Tensor(cur_nodes).cuda()
+            cur_labels = torch.Tensor(cur_labels).cuda()
             cur_sim = sim_matrix(cur_nodes, cur_nodes)
+            # define edge weights here
             cur_adj = cur_adj_cls * cur_sim + cur_adj_unc
-            cur_nodes = cur_nodes.detach().to(torch.float32)
-            updated_nodes.append(self.gcn_module(cur_nodes,
-                                                 cur_adj.detach().cpu().numpy()))
+            cur_nodes = cur_nodes.to(torch.float32)
+            # pass the detached features to the model 
+            updated_nodes.append(self.gcn_module(cur_nodes.detach(),
+                                 cur_adj.detach().cpu().numpy()))
+            nodes_label.append(cur_labels)
             self.update_data(cur_pos, cur_nodes, i, updated_data)
 
-        return updated_nodes, updated_data
+        return updated_nodes, updated_data, nodes_label
         
 
 class CAS_Module(nn.Module):

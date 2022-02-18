@@ -10,33 +10,26 @@ import utils
 def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterion_gcnn, logger, step, net_teacher, m, nodes_dict):
     net.train()
 
-    data, nodes, nodes_label, nodes_pos, nodes_nbr, label, pseudo_label, vid_names, _, index = next(loader_iter)
+    data, label, pseudo_label, vid_names, _, index = next(loader_iter)
     data = data.cuda()
-    nodes = nodes.cuda()
-    nodes_label = nodes_label.cuda()
-    nodes_pos = nodes_pos.cuda()
-    nodes_nbr = nodes_nbr.cuda()
     label = label.cuda()
     pseudo_label = pseudo_label.cuda()
 
     # Calculate GCNN contrastive loss
-    # nodes, gcn_data = gcnn(nodes, nodes_label, nodes_pos, nodes_nbr, data)
-    nodes, gcn_data = gcnn(data, pseudo_labels, label)
-    cost_gcnn = criterion_gcnn(nodes, nodes_label, nodes_nbr)
+    nodes, gcn_data, nodes_label = gcnn(data, pseudo_label, index)
+    cost_gcnn = criterion_gcnn(nodes, nodes_label)
 
-    optimizer_gcnn.zero_grad()
-    cost_gcnn.backward()
-    optimizer_gcnn.step()
+    # optimizer_gcnn.zero_grad()
+    # cost_gcnn.backward()
+    # optimizer_gcnn.step()
 
     # Isolate GCNN gradient and NET gradient
     label = label.reshape(-1, label.shape[-1]).detach()
     pseudo_label = pseudo_label.reshape(label.shape[0], -1,
                                         pseudo_label.shape[-1]).detach()
     # data = torch.cat([gcn_data, data], dim=-1)
-    # data = data.reshape(label.shape[0], -1, data.shape[-1]).detach()
     data = data.reshape(label.shape[0], -1, data.shape[-1]).detach()
-    # print(data.shape)
-    # data = gcn_data.reshape(label.shape[0], -1, gcn_data.shape[-1]).detach()
+    # data = gcn_data.reshape(label.shape[0], -1, data.shape[-1]).detach()
 
     # Calculate WTAL loss
     score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax = net(data)

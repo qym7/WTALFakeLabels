@@ -45,23 +45,19 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
 
             # GCN inner video merge version
             data, label, pseudo_label, vid_name, vid_num_seg = next(load_iter)
+            data = data.reshape(1, data.shape[0], data.shape[1], data.shape[2])
+            pseudo_label = pseudo_label.reshape(1, pseudo_label.shape[0],
+                                                pseudo_label.shape[1], pseudo_label.shape[2])
             gcn_data = torch.zeros_like(data).cuda()
             # for index in range(pseudo_label.shape[-1]):
             for index in torch.where(label==1)[0]:
-                # nodes, nodes_label, nodes_pos = utils.group_node(data[0], pseudo_label[0, :, index])
-                # nodes_nbr = [len(nodes)]
-                # nodes = torch.Tensor(nodes).unsqueeze(0).cuda()
-                # nodes_label = torch.Tensor(nodes_label).unsqueeze(0).cuda()
-                # nodes_pos = torch.Tensor(nodes_pos).unsqueeze(0).to(torch.int).cuda()
-                # _, cur_data = gcnn(nodes.cuda(), nodes_label.cuda(),
-                                #    nodes_pos.cuda(), nodes_nbr, data.cuda())
-                _, cur_data = gcnn(data.cuda(), pseudo_label[:, index])
+                _, cur_data, _ = gcnn(data.cuda(), pseudo_label, [index])
                 gcn_data += cur_data
 
             gcn_data = gcn_data / pseudo_label.shape[-1]
             # data = torch.cat([gcn_data, data.cuda()], dim=-1)
             # data = gcn_data
-            data = data.cuda()
+            data = data.reshape(-1, data.shape[-2], data.shape[-1]).cuda()
 
             vid_num_seg = vid_num_seg[0].cpu().item()
             num_segments = data.shape[1]
