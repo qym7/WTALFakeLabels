@@ -55,9 +55,9 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
                 gcn_data += cur_data
 
             gcn_data = gcn_data / len(torch.where(label==1)[1])
-            # data = torch.cat([gcn_data, data.cuda()], dim=-1)
+            data = torch.cat([gcn_data, data.cuda()], dim=-1)
             # data = gcn_data
-            data = gcn_data.reshape(-1, data.shape[-2], data.shape[-1]).cuda()
+            data = data.reshape(-1, data.shape[-2], data.shape[-1]).cuda()
 
             vid_num_seg = vid_num_seg[0].cpu().item()
             num_segments = data.shape[1]

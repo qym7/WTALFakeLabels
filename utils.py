@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
 from scipy.interpolate import interp1d
 from itertools import product
@@ -310,3 +311,17 @@ def sim_matrix(a, b, eps=1e-8):
     b_norm = b / torch.clamp(b_n, min=eps)
     sim_mt = torch.mm(a_norm, b_norm.transpose(0, 1))
     return sim_mt
+
+def soft_nodes(similarity, nodes):
+    '''
+    input: similarity: N*N
+           nodes: N*dim
+    output:
+        nn_embs: new nodes calculated by a weighted sum of nodes
+                 weights ~ -similariyt
+    '''
+
+    temperature = 0.1
+    softmaxed_sim = F.softmax(-similarity/temperature, dim=-1)
+    nn_embs = torch.mm(softmaxed_sim, nodes)  # n_frames x n_feats
+    return nn_embs

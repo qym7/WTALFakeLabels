@@ -1,6 +1,6 @@
-model_path='./models/gcnn-nocat-label-v1'
-output_path='./outputs/gcnn-nocat-label-v1'
-log_path='./glogs/gcnn-nocat-label-v1'
+model_path='./models/gcnn-labels-gradmin-v1'
+output_path='./outputs/gcnn-labels-gradmin-v1'
+log_path='./glogs/gcnn-labels-gradmin-v1'
 seed=0
 data_path='/GPFS/public/AR/THUMOS14'
 supervision='self'

@@ -139,7 +139,7 @@ class CAS_Module(nn.Module):
         self.len_feature = len_feature
         self.self_train = self_train
         self.conv = nn.Sequential(
-            nn.Conv1d(in_channels=self.len_feature, out_channels=2048, kernel_size=3,
+            nn.Conv1d(in_channels=2*self.len_feature, out_channels=2048, kernel_size=3,
                       stride=1, padding=1),
             nn.ReLU()
         )

@@ -23,17 +23,18 @@ class GCNN_loss(nn.Module):
             nodes_label = torch.cat(nodes_label)
             node_mask = nodes_label!=1
             nodes_label = nodes_label[node_mask]
-            # find pairs
-            similarity_matrix = utils.sim_matrix(nodes, nodes)
             # mask all pairs of different classes
             mask = nodes_label.unsqueeze(1) - nodes_label.unsqueeze(0)
             mask = mask == 0
-            zero_similarity_matrix = similarity_matrix.clone()
-            # eliminate nodes of different type
-            zero_similarity_matrix[~mask] = 1
-            zero_similarity_matrix.fill_diagonal_(1)
 
-        pair_nodes = nodes[zero_similarity_matrix.argmin(dim=0)]
+        # find pairs
+        similarity_matrix = utils.sim_matrix(nodes, nodes)
+        zero_similarity_matrix = similarity_matrix.clone()
+        # eliminate nodes of different type
+        zero_similarity_matrix[~mask] = 1
+        # zero_similarity_matrix.fill_diagonal_(1)
+        # pair_nodes = nodes[zero_similarity_matrix.argmin(dim=0)]
+        pair_nodes = utils.soft_nodes(zero_similarity_matrix, nodes)
 
         return nodes, pair_nodes, nodes_label, mask
 
