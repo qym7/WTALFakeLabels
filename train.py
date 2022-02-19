@@ -28,9 +28,9 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterio
     label = label.reshape(-1, label.shape[-1]).detach()
     pseudo_label = pseudo_label.reshape(label.shape[0], -1,
                                         pseudo_label.shape[-1]).detach()
-    data = torch.cat([gcn_data, data], dim=-1)
+    # data = torch.cat([gcn_data, data], dim=-1)
     # print(data)
-    data = data.reshape(label.shape[0], -1, data.shape[-1]).detach()
+    data = gcn_data.reshape(label.shape[0], -1, data.shape[-1]).detach()
     # data = gcn_data.reshape(label.shape[0], -1, data.shape[-1]).detach()
 
     # Calculate WTAL loss
