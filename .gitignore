@@ -2,3 +2,5 @@ models/
 outputs/
 logs/
 nlogs/
+__pycache__/
+tmp
