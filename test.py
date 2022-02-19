@@ -55,9 +55,9 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
                 gcn_data += cur_data
 
             gcn_data = gcn_data / len(torch.where(label==1)[1])
-            # data = torch.cat([gcn_data, data.cuda()], dim=-1)
+            data = torch.cat([gcn_data, data.cuda()], dim=-1)
             # data = gcn_data
-            data = gcn_data.reshape(-1, data.shape[-2], data.shape[-1]).cuda()
+            data = data.reshape(-1, data.shape[-2], data.shape[-1]).cuda()
 
             vid_num_seg = vid_num_seg[0].cpu().item()
             num_segments = data.shape[1]
@@ -169,9 +169,12 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
 
         test_acc = num_correct / num_total
         json_path = os.path.join(config.output_path, 'inner_result.json')
-        with open(json_path, 'w') as f:
-            json.dump(final_res, f)
-            f.close()
+        try:
+            with open(json_path, 'w') as f:
+                json.dump(final_res, f)
+                f.close()
+        except:
+            print(final_res)
 
         tIoU_thresh = np.linspace(0.1, 0.7, 7)
         anet_detection = ANETdetection(config.gt_path,

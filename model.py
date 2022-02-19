@@ -28,7 +28,8 @@ class GraphConvolution(nn.Module):
             nn.init.zeros_(self.bias)
 
     def forward(self, input_features, adj):
-        support = torch.mm(input_features, self.weight)  # 同weight相乘
+        # support = torch.mm(input_features, self.weight)  # 同weight相乘
+        support = input_features
         output = torch.spmm(adj, support)  # 同adj mat相乘
         if self.use_bias:
             return output + self.bias
@@ -55,8 +56,9 @@ class GCN_Module(nn.Module):
 
     def forward(self, X, adj):
         adj = self.get_adj(adj).cuda()
-        X = F.relu(self.gcn1(X, adj))
-        X = self.gcn2(X, adj)
+        # X = F.relu(self.gcn1(X, adj))
+        # X = self.gcn2(X, adj)
+        X = self.gcn1(X, adj)
 
         return X
 
@@ -137,7 +139,7 @@ class CAS_Module(nn.Module):
         self.len_feature = len_feature
         self.self_train = self_train
         self.conv = nn.Sequential(
-            nn.Conv1d(in_channels=self.len_feature, out_channels=2048, kernel_size=3,
+            nn.Conv1d(in_channels=2*self.len_feature, out_channels=2048, kernel_size=3,
                       stride=1, padding=1),
             nn.ReLU()
         )
