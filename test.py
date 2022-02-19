@@ -173,72 +173,72 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
             with open(json_path, 'w') as f:
                 json.dump(final_res, f)
                 f.close()
+
+            tIoU_thresh = np.linspace(0.1, 0.7, 7)
+            anet_detection = ANETdetection(config.gt_path,
+                                        json_path,
+                                        subset='train',
+                                        tiou_thresholds=tIoU_thresh,
+                                        verbose=False,
+                                        check_status=False)
+            # mAP, average_mAP, fmAP, average_fmAP = anet_detection.evaluate()
+            mAP, average_mAP = anet_detection.evaluate()
+
+            # mIoU
+            if config.test_head == 'sup' and config.supervision != 'weak':
+                print('IoU on sup head')
+                test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, sup_pred_dict, cls_thres)
+            else:
+                print('IoU on wtal head')
+                test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, wtal_pred_dict, cls_thres)
+
+            # Update logger
+            logger.log_value('Test accuracy', test_acc, step)
+            logger.log_value('Average mAP', average_mAP, step)
+            for i in range(tIoU_thresh.shape[0]):
+                logger.log_value('mAP@{:.1f}'.format(tIoU_thresh[i]), mAP[i], step)
+
+            logger.log_value('Average mIoU', test_iou.mean(), step)
+            for i in range(len(cls_thres)):
+                logger.log_value('mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
+                
+            logger.log_value('Average bkg mIoU', test_iou.mean(), step)
+            for i in range(len(cls_thres)):
+                logger.log_value('bkg_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
+
+            logger.log_value('Average act mIoU', test_iou.mean(), step)
+            for i in range(len(cls_thres)):
+                logger.log_value('act_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
+
+
+            # Update test info
+            test_info['step'].append(step)
+            test_info['test_acc'].append(test_acc)
+            test_info['average_mAP'].append(average_mAP)
+            for i in range(tIoU_thresh.shape[0]):
+                test_info['mAP@{:.1f}'.format(tIoU_thresh[i])].append(mAP[i])
+
+            test_info['average_mIoU'].append(test_iou.mean())
+            for i in range(len(cls_thres)):
+                test_info['mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(test_iou[i])
+
+            test_info['average_bkg_mIoU'].append(test_iou.mean())
+            for i in range(len(cls_thres)):
+                test_info['bkg_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(bkg_iou[i])
+
+            test_info['average_act_mIoU'].append(test_iou.mean())
+            for i in range(len(cls_thres)):
+                test_info['act_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(act_iou[i])
+
+            if save:
+                file_to_write = open(os.path.join(config.output_path,
+                                                '{}_wtal_inner_pred_25.pickle'.format(config.test_dataset)), 'wb')
+                pickle.dump(wtal_pred_dict, file_to_write)
+                if sup_cas_softmax is not None:
+                    file_to_write = open(os.path.join(config.output_path,
+                                                '{}_sup_inner_pred_25.pickle'.format(config.test_dataset)), 'wb')
+                    pickle.dump(sup_pred_dict, file_to_write)
         except:
             print(final_res)
 
-        tIoU_thresh = np.linspace(0.1, 0.7, 7)
-        anet_detection = ANETdetection(config.gt_path,
-                                       json_path,
-                                       subset='train',
-                                       tiou_thresholds=tIoU_thresh,
-                                       verbose=False,
-                                       check_status=False)
-        # mAP, average_mAP, fmAP, average_fmAP = anet_detection.evaluate()
-        mAP, average_mAP = anet_detection.evaluate()
-
-        # mIoU
-        if config.test_head == 'sup' and config.supervision != 'weak':
-            print('IoU on sup head')
-            test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, sup_pred_dict, cls_thres)
-        else:
-            print('IoU on wtal head')
-            test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, wtal_pred_dict, cls_thres)
-
-        # Update logger
-        logger.log_value('Test accuracy', test_acc, step)
-        logger.log_value('Average mAP', average_mAP, step)
-        for i in range(tIoU_thresh.shape[0]):
-            logger.log_value('mAP@{:.1f}'.format(tIoU_thresh[i]), mAP[i], step)
-
-        logger.log_value('Average mIoU', test_iou.mean(), step)
-        for i in range(len(cls_thres)):
-            logger.log_value('mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
-            
-        logger.log_value('Average bkg mIoU', test_iou.mean(), step)
-        for i in range(len(cls_thres)):
-            logger.log_value('bkg_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
-
-        logger.log_value('Average act mIoU', test_iou.mean(), step)
-        for i in range(len(cls_thres)):
-            logger.log_value('act_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
-
-
-        # Update test info
-        test_info['step'].append(step)
-        test_info['test_acc'].append(test_acc)
-        test_info['average_mAP'].append(average_mAP)
-        for i in range(tIoU_thresh.shape[0]):
-            test_info['mAP@{:.1f}'.format(tIoU_thresh[i])].append(mAP[i])
-
-        test_info['average_mIoU'].append(test_iou.mean())
-        for i in range(len(cls_thres)):
-            test_info['mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(test_iou[i])
-
-        test_info['average_bkg_mIoU'].append(test_iou.mean())
-        for i in range(len(cls_thres)):
-            test_info['bkg_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(bkg_iou[i])
-
-        test_info['average_act_mIoU'].append(test_iou.mean())
-        for i in range(len(cls_thres)):
-            test_info['act_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(act_iou[i])
-
-        if save:
-            file_to_write = open(os.path.join(config.output_path,
-                                              '{}_wtal_inner_pred_25.pickle'.format(config.test_dataset)), 'wb')
-            pickle.dump(wtal_pred_dict, file_to_write)
-            if sup_cas_softmax is not None:
-                file_to_write = open(os.path.join(config.output_path,
-                                              '{}_sup_inner_pred_25.pickle'.format(config.test_dataset)), 'wb')
-                pickle.dump(sup_pred_dict, file_to_write)
-        
-    return sup_pred_dict
+        return sup_pred_dict

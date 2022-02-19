@@ -13,14 +13,14 @@ class GCNN_loss(nn.Module):
 
     def construct_pairs(self, nodes, nodes_label):
         # ignore the gradient caused by following instructions
-        nodes = torch.cat(nodes)
+        nodes = nodes.reshape(-1, nodes.shape[-1])
         with torch.no_grad():
             # merge nodes
             for i in range(len(nodes_label)):
                 labels = nodes_label[i]
                 labels[labels==2] = labels[labels==2] + i 
                 nodes_label[i] = labels
-            nodes_label = torch.cat(nodes_label)
+            nodes_label = nodes_label.reshape(-1)
             node_mask = nodes_label!=1
             nodes_label = nodes_label[node_mask]
             # find pairs
@@ -30,10 +30,10 @@ class GCNN_loss(nn.Module):
             mask = mask == 0
             zero_similarity_matrix = similarity_matrix.clone()
             # eliminate nodes of different type
-            zero_similarity_matrix[~mask] = 0
-            zero_similarity_matrix.fill_diagonal_(0)
+            zero_similarity_matrix[~mask] = 1
+            zero_similarity_matrix.fill_diagonal_(1)
 
-        pair_nodes = nodes[zero_similarity_matrix.argmax(dim=0)]
+        pair_nodes = nodes[zero_similarity_matrix.argmin(dim=0)]
 
         return nodes, pair_nodes, nodes_label, mask
 
@@ -59,7 +59,7 @@ class ContrastiveLoss(nn.Module):
 
         similarity_matrix = utils.sim_matrix(nodes, nodes)
         # eliminate nodes of same type
-        denominator = ((~mask).int()+1e-4) * torch.exp(similarity_matrix / self.temperature)
+        denominator = ((~mask).int()+1e-6) * torch.exp(similarity_matrix / self.temperature)
         loss_partial = -torch.log(nominator / torch.sum(denominator, dim=1))
         loss = torch.sum(loss_partial) / nodes.shape[0]
 

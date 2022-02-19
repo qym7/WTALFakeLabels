@@ -72,11 +72,15 @@ class GCN(nn.Module):
         self.gcn_module = GCN_Module()
 
     def get_adj_matrix(self, nodes_label):
-        diff_edges = np.where(np.abs(np.diff(nodes_label)) == 1)[0]  # bkg和uncertain, act和uncertain之间的边
+        # bkg和uncertain, act和uncertain之间的边
+        # 在node的设置下uncertain和act/bkg怎么相连?
+        diff_edges = np.where(np.abs(np.diff(nodes_label)) == 1)[0]
         diff_edges = list(product(diff_edges, diff_edges+1))
-        act_edges = np.where(nodes_label == 2)[0]  # act之间的边
+        # act之间的边
+        act_edges = np.where(nodes_label == 2)[0]
         act_edges = list(product(act_edges, act_edges))
-        bkg_edges = np.where(nodes_label == 0)[0]  # bkg之间的边
+        bkg_edges = np.where(nodes_label == 0)[0]
+        # bkg之间的边
         bkg_edges = list(product(bkg_edges, bkg_edges))
         adj_cls = np.zeros((len(nodes_label), len(nodes_label)))
         adj_unc = np.zeros((len(nodes_label), len(nodes_label)))
@@ -84,54 +88,42 @@ class GCN(nn.Module):
             np.add.at(adj_unc, tuple(zip(*diff_edges)), 1)
         np.add.at(adj_cls, tuple(zip(*act_edges)), 1)
         np.add.at(adj_cls, tuple(zip(*bkg_edges)), 1)
-        np.fill_diagonal(adj_cls, 0)  # 消除act和bkg product中产生的自己指向自己的边，这个自指边在adjacent matrix后续normalize过程中会加上
+        # 消除act和bkg product中产生的自己指向自己的边
+        # 这个自指边在adjacent matrix后续normalize过程中会加上
+        np.fill_diagonal(adj_cls, 0)
         adj_cls = np.logical_or(adj_cls, (adj_cls.T)).astype(float)
         adj_unc = np.logical_or(adj_unc, (adj_unc.T)).astype(float)
         
         return torch.Tensor(adj_cls).cuda(), torch.Tensor(adj_unc).cuda()
 
-    def update_data(self, poses, nodes, i, updated_data):
-        with torch.no_grad():
-            for j, pos in enumerate(poses):
-                updated_data[i, pos[0], pos[1]:pos[2]] = nodes[j].repeat((pos[2]-pos[1]).item(), 1)
-
-    def get_nodes(self, data, gt):
-        nodes = []
-        nodes_label = []
-        nodes_pos = []
-        for j in range(data.shape[0]):
-            nodes_, nodes_label_, nodes_pos_ = group_node(data[j], gt[:, j])
-            nodes.append(nodes_)
-            nodes_label.append(nodes_label_)
-            nodes_pos.append(np.column_stack((np.ones(nodes_.shape[0])*j,
-                                              nodes_pos_)))
-
-        return np.concatenate(nodes), np.concatenate(nodes_label),\
-               np.concatenate(nodes_pos).astype(int)
+    def get_nodes_label(self, pseudo_label, index, thres1=0.2, thres2=0.6):
+        channel_label = pseudo_label[:, index]
+        x_label = torch.ones_like(channel_label)
+        x_label[channel_label>thres2] = 2
+        x_label[channel_label<=thres1] = 0
+        return x_label
 
     def forward(self, data, pseudo_label, index):
-        updated_nodes = []
-        nodes_label = []
         updated_data = torch.zeros_like(data)
+        nodes_label = torch.zeros((data.shape[0], data.shape[1]))
+
         for i in range(data.shape[0]):
-            cur_nodes, cur_labels, cur_pos = self.get_nodes(
-                            data[i].detach().cpu().numpy(),
-                            pseudo_label[i, :, :, index[i]].detach().cpu().numpy())
-            cur_adj_cls, cur_adj_unc = self.get_adj_matrix(cur_labels)
-            cur_nodes = torch.Tensor(cur_nodes).cuda()
-            cur_labels = torch.Tensor(cur_labels).cuda()
-            cur_sim = sim_matrix(cur_nodes, cur_nodes)
+            cur_nodes = data[i]
+            cur_labels = self.get_nodes_label(pseudo_label[i], index[i])
+            cur_adj_cls, cur_adj_unc = self.get_adj_matrix(cur_labels.detach().cpu().numpy())
+            # Set edges weight through cur_sim
+            cur_sim = torch.ones((cur_nodes.shape[0], cur_nodes.shape[0])).cuda()
+            # cur_sim = 1 / (1 + sim_matrix(cur_nodes, cur_nodes))
             # define edge weights here
             cur_adj = cur_adj_cls * cur_sim + cur_adj_unc
-            cur_nodes = cur_nodes.to(torch.float32)
-            # pass the detached features to the model 
-            updated_nodes.append(self.gcn_module(cur_nodes.detach(),
-                                 cur_adj.detach().cpu().numpy()))
-            nodes_label.append(cur_labels)
-            self.update_data(cur_pos, cur_nodes, i, updated_data)
+            # cur_nodes = cur_nodes.to(torch.float32)
+            cur_nodes = self.gcn_module(cur_nodes.detach(),
+                                        cur_adj.detach().cpu().numpy())
+            updated_data[i] = cur_nodes
+            nodes_label[i] = cur_labels
 
-        return updated_nodes, updated_data, nodes_label
-        
+        return updated_data, nodes_label
+
 
 class CAS_Module(nn.Module):
     def __init__(self, len_feature, num_classes, self_train):
