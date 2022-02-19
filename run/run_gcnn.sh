@@ -1,6 +1,6 @@
-model_path='./models/UM-gcn-GT-ave-2-1'
-output_path='./outputs/UM-gcn-GT-ave-2-1'
-log_path='./logs/UM-gcn-GT-ave-2-1'
+model_path='./models/gcnn-label-v2'
+output_path='./outputs/gcnn-label-v2'
+log_path='./glogs/gcnn-label-v2'
 seed=0
 data_path='/GPFS/public/AR/THUMOS14'
 supervision='self'

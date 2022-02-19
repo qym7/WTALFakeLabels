@@ -23,8 +23,8 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterio
                         data.shape[-1])
     label = label.cuda()
     pseudo_label = pseudo_label.cuda()
-    nodes, gcn_data, nodes_label = gcnn(data, pseudo_label, index)
-    
+    nodes, gcn_data, nodes_label = gcnn(data.detach(), pseudo_label, index)
+
     # Calculate GCNN loss and back propagate
     cost_gcnn = criterion_gcnn(nodes, nodes_label)
     optimizer_gcnn.zero_grad()
@@ -36,7 +36,7 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterio
     pseudo_label = pseudo_label.reshape(label.shape[0], -1,
                                         pseudo_label.shape[-1]).detach()
     data = torch.cat([gcn_data, data], dim=-1)
-    data = data.reshape(label.shape[0], -1, data.shape[-1]).detach()
+    data = data.reshape(label.shape[0], -1, data.shape[-1])
 
     # Calculate WTAL results and calculate loss
     score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax = net(data)

@@ -30,10 +30,10 @@ class GCNN_loss(nn.Module):
             mask = mask == 0
             zero_similarity_matrix = similarity_matrix.clone()
             # eliminate nodes of different type
-            zero_similarity_matrix[~mask] = 0
-            zero_similarity_matrix.fill_diagonal_(0)
+            zero_similarity_matrix[~mask] = 1
+            # zero_similarity_matrix.fill_diagonal_(1)
 
-        pair_nodes = nodes[zero_similarity_matrix.argmax(dim=0)]
+        pair_nodes = nodes[zero_similarity_matrix.argmin(dim=0)]
 
         return nodes, pair_nodes, nodes_label, mask
 
