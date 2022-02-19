@@ -97,10 +97,12 @@ class GCN(nn.Module):
         nodes = []
         nodes_label = []
         nodes_pos = []
+        # iterate all videos of a certain class in a batch
         for j in range(data.shape[0]):
             nodes_, nodes_label_, nodes_pos_ = group_node(data[j], gt[:, j])
             nodes.append(nodes_)
             nodes_label.append(nodes_label_)
+            # add a column in nodes_pos to mark the video index
             nodes_pos.append(np.column_stack((np.ones(nodes_.shape[0])*j,
                                               nodes_pos_)))
 
@@ -129,7 +131,7 @@ class GCN(nn.Module):
             self.update_data(cur_pos, cur_nodes, i, updated_data)
 
         return updated_nodes, updated_data, nodes_label
-        
+
 
 class CAS_Module(nn.Module):
     def __init__(self, len_feature, num_classes, self_train):
@@ -151,7 +153,7 @@ class CAS_Module(nn.Module):
 
         if self.self_train:
             self.sup_classifier = nn.Sequential(
-                nn.Conv1d(in_channels=2*2048, out_channels=num_classes, kernel_size=1,
+                nn.Conv1d(in_channels=2048, out_channels=num_classes, kernel_size=1,
                         stride=1, padding=0, bias=False)
             )
             # Dropout rate changing point, default 0.7

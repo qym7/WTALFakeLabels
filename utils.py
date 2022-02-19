@@ -270,7 +270,6 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     
     return torch.sparse.FloatTensor(indices, values, shape)
 
-
 def group_node(x, pseudo_label, thres1=0.2, thres2=0.4):
     '''
     Group nodes for a single video
@@ -280,7 +279,7 @@ def group_node(x, pseudo_label, thres1=0.2, thres2=0.4):
     x_label[pseudo_label>thres2] = 2
     x_label[pseudo_label<=thres1] = 0
 
-    split_pos = np.where(np.diff(pseudo_label) != 0)[0] + 1
+    split_pos = np.where(np.diff(x_label) != 0)[0] + 1
     split_gt = np.split(x_label, split_pos)
     split_x = np.split(x, split_pos)
     bg_pos = 0
