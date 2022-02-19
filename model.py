@@ -143,7 +143,7 @@ class CAS_Module(nn.Module):
         )
 
         self.classifier = nn.Sequential(
-            nn.Conv1d(in_channels=2*2048, out_channels=num_classes, kernel_size=1,
+            nn.Conv1d(in_channels=2048, out_channels=num_classes, kernel_size=1,
                       stride=1, padding=0, bias=False)
         )
 

@@ -49,14 +49,14 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
             data = data.reshape(1, data.shape[0], data.shape[1], data.shape[2])
             pseudo_label = pseudo_label.reshape(1, pseudo_label.shape[0],
                                                 pseudo_label.shape[1], pseudo_label.shape[2])
-            gcn_data = torch.zeros_like(data).cuda()
+            # gcn_data = torch.zeros_like(data).cuda()
 
-            for index in torch.where(label==1)[1]:
-                _, cur_data, _ = gcnn(data.cuda(), pseudo_label, [index])
-                gcn_data += cur_data
+            # for index in torch.where(label==1)[1]:
+            #     _, cur_data, _ = gcnn(data.cuda(), pseudo_label, [index])
+            #     gcn_data += cur_data
 
-            gcn_data = gcn_data / len(torch.where(label==1)[1])
-            data = torch.cat([gcn_data, data.cuda()], dim=-1)
+            # gcn_data = gcn_data / len(torch.where(label==1)[1])
+            # data = torch.cat([gcn_data, data.cuda()], dim=-1)
             data = data.reshape(-1, data.shape[-2], data.shape[-1]).cuda()
 
             vid_num_seg = vid_num_seg[0].cpu().item()
