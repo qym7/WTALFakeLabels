@@ -240,8 +240,8 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
                                                 '{}_sup_inner_pred_25.pickle'.format(config.test_dataset)), 'wb')
                     pickle.dump(sup_pred_dict, file_to_write)
 
-    except:
-        print(final_res)
+        except:
+            print(final_res)
 
-    return sup_pred_dict
+        return sup_pred_dict
 
