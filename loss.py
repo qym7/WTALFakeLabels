@@ -27,14 +27,30 @@ class GCNN_loss(nn.Module):
             mask = nodes_label.unsqueeze(1) - nodes_label.unsqueeze(0)
             mask = mask == 0
 
-        # find pairs
-        similarity_matrix = utils.sim_matrix(nodes, nodes)
-        zero_similarity_matrix = similarity_matrix.clone()
-        # eliminate nodes of different type
-        zero_similarity_matrix[~mask] = 1
-        # zero_similarity_matrix.fill_diagonal_(1)
-        # pair_nodes = nodes[zero_similarity_matrix.argmin(dim=0)]
-        pair_nodes = utils.soft_nodes(zero_similarity_matrix, nodes)
+            ########## GRADIENT FREE VERSION BEGIN ###########
+            # find pairs
+            similarity_matrix = utils.sim_matrix(nodes, nodes)
+            # mask all pairs of different classes
+            mask = nodes_label.unsqueeze(1) - nodes_label.unsqueeze(0)
+            mask = mask == 0
+            zero_similarity_matrix = similarity_matrix.clone()
+            # eliminate nodes of different type
+            zero_similarity_matrix[~mask] = 1
+            zero_similarity_matrix.fill_diagonal_(1)
+
+        pair_nodes = nodes[zero_similarity_matrix.argmin(dim=0)]
+        ########## GRADIENT FREE VERSION BEGIN ###########
+
+        # ########## GRADIENT VERSION BEGIN ###########
+        # # find pairs
+        # similarity_matrix = utils.sim_matrix(nodes, nodes)
+        # zero_similarity_matrix = similarity_matrix.clone()
+        # # eliminate nodes of different type
+        # zero_similarity_matrix[~mask] = 1
+        # # zero_similarity_matrix.fill_diagonal_(1)
+        # # pair_nodes = nodes[zero_similarity_matrix.argmin(dim=0)]
+        # pair_nodes = utils.soft_nodes(zero_similarity_matrix, nodes)
+        # ########## GRADIENT VERSION END ###########
 
         return nodes, pair_nodes, nodes_label, mask
 
