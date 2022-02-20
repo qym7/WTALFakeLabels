@@ -50,16 +50,17 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
             pseudo_label = pseudo_label.reshape(1, 1, pseudo_label.shape[-2], pseudo_label.shape[-1]).cuda()
             label = label.reshape(-1, label.shape[-1]).cuda()
 
-            updated_data = torch.zeros_like(data.reshape(-1, data.shape[-2], data.shape[-1]))
+            gcn_data = torch.zeros_like(data)
             for index in torch.where(label[0]==1)[0]:
-                cur_data, cur_nodes, cur_nodes_label, _ = gcnn(data, pseudo_label, [index], eval=True)
-                updated_data += cur_data
+                cur_data, cur_nodes, cur_nodes_label = gcnn(data, pseudo_label, [index], eval=True)
+                gcn_data += cur_data
                 nodes_lst.append(torch.stack(cur_nodes)[0].detach().cpu().numpy())
                 nodes_label_lst.append(torch.stack(cur_nodes_label)[0].detach().cpu().numpy())
                 class_lst.append(np.ones(len(cur_nodes[0]))*(index.detach().cpu().item()))
-            data = updated_data/len(torch.where(label[0]==1)[0])
+            gcn_data = gcn_data/len(torch.where(label[0]==1)[0])
 
-            data = data.detach()
+            data = torch.cat([data, gcn_data], dim=-1)
+            data = data.reshape(-1, data.shape[-2], data.shape[-1]).detach()
             pseudo_label = pseudo_label.detach()
 
             # # normal version

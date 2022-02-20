@@ -29,9 +29,9 @@ class GraphConvolution(nn.Module):
 
     def forward(self, input_features, adj):
         support = torch.mm(input_features, self.weight)  # 同weight相乘
-        support = input_features
+        # support = input_features
         output = torch.spmm(adj, support)  # 同adj mat相乘
-        # print(output)
+        # return output
         if self.use_bias:
             return output + self.bias
         else:
@@ -49,7 +49,7 @@ class GCN_Module(nn.Module):
 
     def get_adj(self, adj):
         adj = sp.csr_matrix(adj)
-        # adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
+        adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
         adj = normalize(adj + sp.eye(adj.shape[0]))
         adj = sparse_mx_to_torch_sparse_tensor(adj)
 
@@ -57,9 +57,9 @@ class GCN_Module(nn.Module):
 
     def forward(self, X, adj):
         adj = self.get_adj(adj).cuda()
-        # X = F.relu(self.gcn1(X, adj))
-        # X = self.gcn2(X, adj)
-        X = self.gcn1(X, adj)
+        X = F.relu(self.gcn1(X, adj))
+        X = self.gcn2(X, adj)
+        # X = self.gcn1(X, adj)
 
         return X
 
@@ -68,36 +68,47 @@ class GCN(nn.Module):
     '''
     Reference: https://www.cnblogs.com/foghorn/p/15240260.html
     '''
-    def __init__(self):
+    def __init__(self, len_feature):
         super(GCN, self).__init__()
+        self.len_feature = len_feature
         self.gcn_module = GCN_Module()
+        self.conv = nn.Sequential(
+            nn.Conv1d(in_channels=self.len_feature, out_channels=2048, kernel_size=3,
+                      stride=1, padding=1),
+            nn.ReLU()
+        )
 
-    def forward(self, x, gt, index, eval=True):
+    def forward(self, x, gt, index, eval=False):
+        N, n, T, dim = x.shape
+        features = x.reshape(-1, T, dim).permute(0, 2, 1)
+        features = self.conv(features)
+        features = features.permute(0, 2, 1).reshape(N, n, T, dim)
+        # features = x
         nodes = []
         nodes_label = []
-        vids_label = []
-        updated_x = torch.zeros_like(x)
-         # bs * N * T * 20, bs也意味着有bs类的视频，每类视频有N个
-        for i in range(len(x)):
-            vid_cls = x[i]
+        updated_x = torch.zeros_like(features).cuda()
+
+        # bs * N * T * 20, bs也意味着有bs类的视频，每类视频有N个
+        for i in range(len(features)):
+            vids = features[i]
             gt_cls = gt[i, :, :, index[i]]  # N * T
             # 由于只有在同类视频里产生节点图，所以需要迭代循环所有类
-            nodes_, nodes_label_, nodes_pos_, vid_label_ = group_node(vid_cls, gt_cls)
+            nodes_, nodes_label_, nodes_pos_, vid_label_ = group_node(vids, gt_cls)
             adj = generate_adj_matrix(nodes_label_)
+            nodes_label_ = torch.from_numpy(nodes_label_).cuda()
+            nodes_ = torch.from_numpy(nodes_).cuda()
             # pass to GCN
-            x_ = self.gcn_module(torch.from_numpy(nodes_).detach().cuda(), adj)
-            # 根据gcn处理后的node和node在特征中的位置更新features
-            for j, pos in enumerate(nodes_pos_):
-                updated_x[i, pos[0], pos[1]:pos[2]] = x_[j].repeat(pos[2]-pos[1], 1).clone()
+            x_ = self.gcn_module(nodes_.detach(), adj)
             # 加入N个同类视频的节点
             nodes.append(x_)
-            vids_label.append(torch.Tensor(vid_label_))
-            # 产生上述节点对应标签，1为action，0为bkg，-1为不确定
-            nodes_label.append(torch.from_numpy(nodes_label_).cuda())
+            # 产生上述节点对应标签，2为action，0为bkg，1为不确定
+            nodes_label.append(nodes_label_)
+            # 根据gcn处理后的node和node在特征中的位置更新features
+            with torch.no_grad():
+                for j, pos in enumerate(nodes_pos_):
+                    updated_x[i, pos[0], pos[1]:pos[2]] = x_[j].repeat(pos[2]-pos[1], 1).clone()
 
-        updated_x = updated_x.reshape(-1, x.shape[-2], x.shape[-1])
-
-        return updated_x, nodes, nodes_label, vids_label
+        return updated_x, nodes, nodes_label
 
 
 class CAS_Module(nn.Module):
@@ -106,7 +117,7 @@ class CAS_Module(nn.Module):
         self.len_feature = len_feature
         self.self_train = self_train
         self.conv = nn.Sequential(
-            nn.Conv1d(in_channels=self.len_feature, out_channels=2048, kernel_size=3,
+            nn.Conv1d(in_channels=2*self.len_feature, out_channels=2048, kernel_size=3,
                       stride=1, padding=1),
             nn.ReLU()
         )
@@ -115,16 +126,7 @@ class CAS_Module(nn.Module):
             nn.Conv1d(in_channels=2048, out_channels=num_classes, kernel_size=1,
                       stride=1, padding=0, bias=False)
         )
-        # Dropout rate changing point, default 0.7
-        # self.classifier = nn.Sequential(
-        #                 nn.Linear(2048, 512),
-        #                 nn.ReLU(),
-        #                 nn.Dropout(0.1),
-        #                 nn.Linear(512, 128),
-        #                 nn.ReLU(),
-        #                 nn.Dropout(0.5),
-        #                 nn.Linear(128, 20)
-        #     )
+
         self.drop_out = nn.Dropout(p=0.7)
 
         if self.self_train:

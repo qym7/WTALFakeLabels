@@ -71,6 +71,8 @@ class GCNThumosFeature(data.Dataset):
         for idx in v_index:
             data_, label_, temp_anno_, vid_name_, vid_num_seg_ = self.get_single_item(idx)
             data.append(data_)
+            label_ = np.zeros(self.num_classes)
+            label_[index] = 1
             label.append(label_)
             temp_anno.append(temp_anno_)
             vid_name.append(vid_name_)

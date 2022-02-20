@@ -59,6 +59,7 @@ class Config(object):
         self.N = args.N
         self.dynamic = args.dynamic
         self.gcnn_weight = args.gcnn_weight
+        self.map = args.map
 
 
     def __str__(self):
@@ -87,3 +88,6 @@ class_dict = {0: 'BaseballPitch',
                 17: 'TennisSwing',
                 18: 'ThrowDiscus',
                 19: 'VolleyballSpiking'}
+
+NODES_NUMBER = {i: 100 for i in range(20)}
+NODES_NUMBER[20] = 300

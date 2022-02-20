@@ -11,55 +11,60 @@ class GCNN_loss(nn.Module):
         self.gcnn_weight = gcnn_weight
         self.loss = ContrastiveLoss(0.5)
 
-    def construct_pairs(self, nodes, nodes_label):
+    def construct_pairs(self, nodes, nodes_label, index, nodes_bank):
         # ignore the gradient caused by following instructions
-        nodes = torch.cat(nodes)
         with torch.no_grad():
-            # merge nodes
+            # merge nodes with labels of the same form of nodes_bank
             for i in range(len(nodes_label)):
                 labels = nodes_label[i]
-                labels[labels==2] = labels[labels==2] + i 
+                labels[labels==1] = 21
+                labels[labels==0] = 20
+                labels[labels==2] = index[i].item()
                 nodes_label[i] = labels
             nodes_label = torch.cat(nodes_label)
-            node_mask = nodes_label!=1
-            nodes_label = nodes_label[node_mask]
-            # find pairs
-            similarity_matrix = utils.sim_matrix(nodes, nodes)
-            # mask all pairs of different classes
-            mask = nodes_label.unsqueeze(1) - nodes_label.unsqueeze(0)
-            mask = mask == 0
-            zero_similarity_matrix = similarity_matrix.clone()
-            # eliminate nodes of different type
-            zero_similarity_matrix[~mask] = 1
-            # zero_similarity_matrix.fill_diagonal_(1)
+            # mask uncertain nodes
+            node_mask = nodes_label!=21
+            # find pair for every nodes (100*21=2100)
+            available_nodes = torch.cat([nodes_bank[i] for i in range(21)
+                                         if len(nodes_bank[i])>0]).cuda()
+            availabel_nodes_label = torch.cat([torch.ones(nodes_bank[i].shape[0]).cuda()*i
+                                               for i in range(21) if len(nodes_bank[i])>0]).cuda()
 
-        pair_nodes = nodes[zero_similarity_matrix.argmin(dim=0)]
+         # delete uncertain nodes
+        nodes = torch.cat(nodes)[node_mask]
+        nodes_label = nodes_label[node_mask]
+        # calculate similarity
+        similarity_matrix = utils.sim_matrix(nodes, available_nodes)
+        # mask all pairs of same classes
+        mask = nodes_label.unsqueeze(1) - availabel_nodes_label.unsqueeze(0)
+        mask = mask == 0
+        one_similarity_matrix = similarity_matrix.clone()
+        # eliminate nodes of different type
+        one_similarity_matrix[~mask] = 1
 
-        return nodes, pair_nodes, nodes_label, mask
+        # argmin can not be propagated, detach in order to prevent abnormal results?
+        pair_index = one_similarity_matrix.argmin(dim=1).detach()
 
-    def forward(self, nodes, nodes_label):
-        nodes, pair_nodes, nodes_label, mask = self.construct_pairs(nodes, nodes_label)
-        loss = self.loss(nodes, pair_nodes, nodes_label, mask)
+        pair_similarity = one_similarity_matrix[torch.arange(nodes.shape[0]), pair_index]
 
+        return nodes, pair_similarity, nodes_label, mask, similarity_matrix
+
+    def forward(self, nodes, nodes_label, index, nodes_bank):
+        nodes, pair_similarity, nodes_label, mask, similarity_matrix = self.construct_pairs(nodes, nodes_label, index, nodes_bank)
+        loss = self.loss(nodes, pair_similarity, nodes_label, mask, similarity_matrix)
         return loss * self.gcnn_weight
 
 
 class ContrastiveLoss(nn.Module):
-    def __init__(self, temperature=0.5):
+    def __init__(self, temperature=0.7):
         super().__init__()
         self.register_buffer("temperature", torch.tensor(temperature))
 
-    def forward(self, nodes, pair_nodes, nodes_labels, mask):
-
-        z = F.normalize(nodes, dim=1)
-        z_p = F.normalize(pair_nodes, dim=1)
-        positive_similarity = F.cosine_similarity(z.unsqueeze(1), z_p.unsqueeze(0), dim=2)
-
-        nominator = torch.exp(positive_similarity / self.temperature)
-
-        similarity_matrix = utils.sim_matrix(nodes, nodes)
-        # eliminate nodes of same type
-        denominator = ((~mask).int()+1e-4) * torch.exp(similarity_matrix / self.temperature)
+    def forward(self, nodes, pair_similarity, nodes_labels, mask, similarity_matrix):
+        # Calculate positive-pair similairy
+        nominator = torch.exp(pair_similarity / self.temperature)
+        # Calculate negetive-pair similairy
+        denominator = ((~mask).int()+1e-6) * torch.exp(similarity_matrix / self.temperature)
         loss_partial = -torch.log(nominator / torch.sum(denominator, dim=1))
         loss = torch.sum(loss_partial) / nodes.shape[0]
 
@@ -171,7 +176,6 @@ class UM_loss(nn.Module):
         loss = {}
  
         label = label / torch.sum(label, dim=1, keepdim=True)
-
         loss_cls = self.ce_criterion(score_act, label)
 
         label_bkg = torch.ones_like(label).cuda()

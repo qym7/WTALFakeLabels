@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     test(net, gcnn, config, logger, test_loader, test_info, 0, gt,
          cls_thres=cls_thres, model_file=config.model_file,
-         save=config.save)
+         save=config.save, mAP=True)
 
     utils.save_best_record_thumos(test_info, 
         os.path.join(config.output_path, "test_record_{}_{}.txt".format(config.test_head, 

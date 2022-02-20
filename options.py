@@ -48,6 +48,8 @@ def parse_args():
     parser.add_argument('--N', default=1, type=int, help='for every class choose N videos at a time')
     parser.add_argument('--gcnn_weight', default=0.1, type=float, help='loss weight for gcn')
     parser.add_argument('--dynamic', default=0, type=int, help='dynamic update or not')
+    parser.add_argument('--map', default=1, type=int, help='evaluate map or not')
+
 
     return init_args(parser.parse_args())
 

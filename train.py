@@ -5,40 +5,62 @@ import numpy as np
 from collections import OrderedDict
 
 import utils
+from config import NODES_NUMBER
 
 
-def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterion_gcnn, logger, step, net_teacher, m, nodes_dict):
+def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
+          criterion, criterion_gcnn, logger, step, gcnn_teacher,
+          m, nodes_bank):
     net.train()
 
     data, label, gt, vid_names, _, index = next(loader_iter)
     data = data.cuda()  # reshaped in net
     gt = gt.cuda()  # reshaped in net
-    label = label.reshape(-1, label.shape[-1]).cuda()
+    label = label.cuda()
+    index = index.cuda()
 
-    data, nodes, nodes_label, vids_label = gcnn(data, gt, index, vid_names)
-    cost_gcnn = criterion_gcnn(nodes, nodes_label)
+    # Get GCNN feature
+    gcn_data, nodes, nodes_label = gcnn(data, gt, index, eval=False)
+    # Update nodes_bank
+    # Do not use grad to accelerate algorithm
+    with torch.no_grad():
+        _, t_nodes, _ = gcnn_teacher(data, gt, index, eval=False)
+    for i in range(len(index)):
+        not_torch_idx = index[i].detach().cpu().item()
+        nodes_number = NODES_NUMBER[not_torch_idx]
+        if len(nodes_bank[not_torch_idx]) == 0:
+            nodes_bank[not_torch_idx] = t_nodes[i]
+        else:
+            nodes_bank[not_torch_idx] = torch.cat((t_nodes[i], nodes_bank[not_torch_idx]))
+        nodes_bank[not_torch_idx] = nodes_bank[not_torch_idx][:nodes_number]
 
-    data = data.detach()
+    # Calculate Contrastive Loss and Back-propagate GCNN
+    cost_gcnn = criterion_gcnn(nodes, nodes_label, index, nodes_bank)
+    # optimizer_gcnn.zero_grad()
+    # cost_gcnn.backward()
+    # optimizer_gcnn.step()
+
+    # Isolate gradient between GCNN and WTAL model
+    label = label.reshape(-1, label.shape[-1]).to(torch.float32).detach()
+    data = torch.cat([data, gcn_data], dim=-1)
+    data = data.reshape(-1, data.shape[-2], data.shape[-1]).detach()
     gt = gt.reshape(-1, gt.shape[-2], gt.shape[-1]).detach()
     score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax = net(data)
 
+    # Calculate WTAL Loss and Back-propagate
     cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, label,
                            gt, sup_cas_softmax, step=step)
     loss['loss_gcnn'] = cost_gcnn
     print("loss_gcnn", cost_gcnn.detach().cpu().item())
 
     optimizer.zero_grad()
-    optimizer_gcnn.zero_grad()
-    # cost_gcnn.backward()
-    cost = cost + cost_gcnn
     cost.backward()
     optimizer.step()
-    optimizer_gcnn.step()
 
-    if net_teacher is not None:
+    if gcnn_teacher is not None:
         # update teacher parameters by EMA
-        student_params = OrderedDict(net.named_parameters())
-        teacher_params = OrderedDict(net_teacher.named_parameters())
+        student_params = OrderedDict(gcnn.named_parameters())
+        teacher_params = OrderedDict(gcnn_teacher.named_parameters())
 
         # check if both model contains the same set of keys
         assert student_params.keys() == teacher_params.keys()
@@ -48,8 +70,8 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterio
             # shadow_variable -= (1 - decay) * (shadow_variable - variable)
             teacher_params[name] = teacher_params[name] * m + (1 - m) * param
 
-        student_buffers = OrderedDict(net.named_buffers())
-        teacher_buffers = OrderedDict(net_teacher.named_buffers())
+        student_buffers = OrderedDict(gcnn.named_buffers())
+        teacher_buffers = OrderedDict(gcnn_teacher.named_buffers())
 
         # check if both model contains the same set of keys
         assert student_buffers.keys() == teacher_buffers.keys()

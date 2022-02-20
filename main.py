@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     config = Config(args)
     worker_init_fn = None
-    
+
     # =================== booking a gpu ==================
     # careful, you have to first load the data
     print('current device: ', torch.cuda.current_device())
@@ -40,16 +40,14 @@ if __name__ == "__main__":
 
     net = Model(config.len_feature, config.num_classes, 
                 config.r_act, config.r_bkg,
-                config.supervision!='weak')
+                False)
     net = net.cuda()
-    gcnn = GCN()
+    gcnn = GCN(config.len_feature)
     gcnn = gcnn.cuda()
-    net_teacher = None
-    if bool(config.ema):
-        net_teacher = Model(config.len_feature, config.num_classes, 
-                        config.r_act, config.r_bkg,
-                        config.supervision!='weak')
-        net_teacher = net_teacher.cuda()
+    # if bool(config.ema):
+    # Use EMA structure to realise contrastive learning dictionary
+    gcnn_teacher = GCN(config.len_feature)
+    gcnn_teacher = gcnn_teacher.cuda()
 
     train_set = GCNThumosFeature(data_path=config.data_path, mode='train',
                         modal=config.modal, feature_fps=config.feature_fps,
@@ -106,7 +104,7 @@ if __name__ == "__main__":
 
     logger = Logger(config.log_path)
 
-    nodes_dict = {}
+    nodes_bank = {i: [] for i in range(21)}
     for step in tqdm(
             range(1, config.num_iters + 1),
             total = config.num_iters,
@@ -121,10 +119,10 @@ if __name__ == "__main__":
             loader_iter = iter(train_loader)
 
         train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterion_gcnn, logger, step,
-              net_teacher, config.m, nodes_dict)
+              gcnn_teacher, config.m, nodes_bank)
 
         sup_pred_dict = test(net, gcnn, config, logger, test_loader, test_info, step, gt,
-                        cls_thres=cls_thres, save=False)
+                        cls_thres=cls_thres, save=False, mAP=False)
 
         iou = [test_info['mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1])][-1] for thres in cls_thres]
 

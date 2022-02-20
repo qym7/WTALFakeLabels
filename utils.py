@@ -285,7 +285,7 @@ def generate_adj_matrix(nodes_label):
     np.add.at(adj, tuple(zip(*bkg_edges)), 1)
     np.fill_diagonal(adj, 0)  # 消除act和bkg product中产生的自己指向自己的边，这个自指边在adjacent matrix后续normalize过程中会加上
     adj = np.logical_or(adj, (adj.T)).astype(float)
-    
+
     return adj
 
 def group_node(x, gt, thres1=0.2, thres2=0.4):
