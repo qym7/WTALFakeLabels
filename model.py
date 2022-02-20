@@ -94,9 +94,18 @@ class GCN(nn.Module):
             gt_cls = gt[i, :, :, index[i]]  # N * T
             # 由于只有在同类视频里产生节点图，所以需要迭代循环所有类
             nodes_, nodes_label_, nodes_pos_, vid_label_ = group_node(vids, gt_cls)
-            adj = generate_adj_matrix(nodes_label_)
+            adj_cls, adj_unc = generate_adj_matrix(nodes_label_)
             nodes_label_ = torch.from_numpy(nodes_label_).cuda()
             nodes_ = torch.from_numpy(nodes_).cuda()
+            # add edge weight
+            # VERSION: weighted1
+            cur_sim = torch.exp(-sim_matrix(nodes_, nodes_)/0.02)
+            cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
+            # VERSION: weighted2
+            cur_sim = torch.exp(-sim_matrix(nodes_, nodes_)/0.1)
+            cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
+
+            adj = cur_sim.detach().cpu().numpy() * adj_cls + adj_unc
             # pass to GCN
             x_ = self.gcn_module(nodes_.detach(), adj)
             # 加入N个同类视频的节点
