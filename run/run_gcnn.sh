@@ -1,6 +1,6 @@
-model_path='./models/UM-gcn-GT-ave-2-1'
-output_path='./outputs/UM-gcn-GT-ave-2-1'
-log_path='./logs/UM-gcn-GT-ave-2-1'
+model_path='./models/test'
+output_path='./outputs/test'
+log_path='./glogs/test'
 seed=0
 data_path='/GPFS/public/AR/THUMOS14'
 supervision='self'
