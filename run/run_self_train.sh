@@ -1,12 +1,12 @@
-model_path='./models/UM-test'
-output_path='./outputs/UM-test'
-log_path='./logs/UM-test'
+model_path='./models/average'
+output_path='./outputs/average'
+log_path='./glogs/average'
 seed=0
 data_path='/DATA7_DB7/data/cju/20/BaSNet/dataset/THUMOS14'
 supervision='self'
 # CHANGE PATH!!!!!
-supervision_path='/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/outputs/UM-val/val_pred_25.pickle'
-# supervision_path='/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/dataset/thumos_annotations/val_gt_25.pickle'
+# supervision_path='/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/outputs/UM-val/val_pred_25.pickle'
+supervision_path='/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/dataset/thumos_annotations/val_gt_25.pickle'
 thres='0.2'
 thres_down='-1'
 lmbd='10'

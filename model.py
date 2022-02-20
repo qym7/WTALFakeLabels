@@ -76,7 +76,7 @@ class GCN(nn.Module):
         nodes = []
         nodes_label = []
         vids_label = []
-        new_x = torch.zeros_like(x)
+        updated_x = torch.zeros_like(x)
          # bs * N * T * 20, bs也意味着有bs类的视频，每类视频有N个
         for i in range(len(x)):
             vid_cls = x[i]
@@ -88,16 +88,16 @@ class GCN(nn.Module):
             x_ = self.gcn_module(torch.from_numpy(nodes_).detach().cuda(), adj)
             # 根据gcn处理后的node和node在特征中的位置更新features
             for j, pos in enumerate(nodes_pos_):
-                new_x[i, pos[0], pos[1]:pos[2]] = x_[j].repeat(pos[2]-pos[1], 1).clone()
+                updated_x[i, pos[0], pos[1]:pos[2]] = x_[j].repeat(pos[2]-pos[1], 1).clone()
             # 加入N个同类视频的节点
             nodes.append(x_)
             vids_label.append(torch.Tensor(vid_label_))
             # 产生上述节点对应标签，1为action，0为bkg，-1为不确定
             nodes_label.append(torch.from_numpy(nodes_label_).cuda())
 
-        new_x = new_x.reshape(-1, x.shape[-2], x.shape[-1])
+        updated_x = updated_x.reshape(-1, x.shape[-2], x.shape[-1])
 
-        return new_x, nodes, nodes_label, vids_label
+        return updated_x, nodes, nodes_label, vids_label
 
 
 class CAS_Module(nn.Module):

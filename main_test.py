@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     config = Config(args)
     worker_init_fn = None
-    print(1)
+
     if config.seed >= 0:
         utils.set_seed(config.seed)
         worker_init_fn = np.random.seed(config.seed)
@@ -34,7 +34,6 @@ if __name__ == "__main__":
     net = net.cuda()
     gcnn = GCN()
     gcnn = gcnn.cuda()
-    print(2)
 
     test_loader = data.DataLoader(
         ThumosFeature(data_path=config.data_path, mode=config.test_dataset,

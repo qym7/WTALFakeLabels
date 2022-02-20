@@ -14,7 +14,7 @@ from eval_utils import plot_pred, plot_node
 
 def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
          cls_thres=np.arange(0.1, 1, 0.1),
-         model_file=None, save=False):
+         model_file=None, save=False, mAP=False):
     with torch.no_grad():
         net.eval()
 
@@ -31,10 +31,11 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
         if not os.path.exists(savefig_path):
             os.mkdir(savefig_path)
 
-        final_res = {}
-        final_res['version'] = 'VERSION 1.3'
-        final_res['results'] = {}
-        final_res['external_data'] = {'used': True, 'details': 'Features from I3D Network'}
+        if mAP:
+            final_res = {}
+            final_res['version'] = 'VERSION 1.3'
+            final_res['results'] = {}
+            final_res['external_data'] = {'used': True, 'details': 'Features from I3D Network'}
 
         num_correct = 0.
         num_total = 0.
@@ -44,22 +45,22 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
         for i in range(len(test_loader.dataset)):
 
             # GCN inner video merge version
-            data, label, gt, vid_name, vid_num_seg = next(load_iter)
+            data, label, pseudo_label, vid_name, vid_num_seg = next(load_iter)
             data =data.reshape(1, 1, data.shape[-2], data.shape[-1]).cuda()
-            gt = gt.reshape(1, 1, gt.shape[-2], gt.shape[-1]).cuda()
-            label = label.reshape(-1, _label.shape[-1]).cuda()
+            pseudo_label = pseudo_label.reshape(1, 1, pseudo_label.shape[-2], pseudo_label.shape[-1]).cuda()
+            label = label.reshape(-1, label.shape[-1]).cuda()
 
-            new_data = torch.zeros_like(_data.reshape(-1, data.shape[-2], data.shape[-1]))
-            for index in torch.where(_label[0]==1)[0]:
-                cur_data, cur_nodes, cur_nodes_label, _ = gcnn(data, gt, [index], eval=True)
-                new_data += cur_data
+            updated_data = torch.zeros_like(data.reshape(-1, data.shape[-2], data.shape[-1]))
+            for index in torch.where(label[0]==1)[0]:
+                cur_data, cur_nodes, cur_nodes_label, _ = gcnn(data, pseudo_label, [index], eval=True)
+                updated_data += cur_data
                 nodes_lst.append(torch.stack(cur_nodes)[0].detach().cpu().numpy())
                 nodes_label_lst.append(torch.stack(cur_nodes_label)[0].detach().cpu().numpy())
                 class_lst.append(np.ones(len(cur_nodes[0]))*(index.detach().cpu().item()))
-            data = new_data/len(torch.where(_label[0]==1)[0])
-            
+            data = updated_data/len(torch.where(label[0]==1)[0])
+
             data = data.detach()
-            gt = gt.detach()
+            pseudo_label = pseudo_label.detach()
 
             # # normal version
             # data, label, _, vid_name, vid_num_seg = next(load_iter)
@@ -67,12 +68,12 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
             # label = label.cuda()
 
             vid_num_seg = vid_num_seg[0].cpu().item()
-            num_segments = _data.shape[1]
-            score_act, _, feat_act, feat_bkg, features, cas_softmax, sup_cas_softmax = net(_data)
+            num_segments = data.shape[1]
+            score_act, _, feat_act, feat_bkg, features, cas_softmax, sup_cas_softmax = net(data)
             feat_magnitudes_act = torch.mean(torch.norm(feat_act, dim=2), dim=1)
             feat_magnitudes_bkg = torch.mean(torch.norm(feat_bkg, dim=2), dim=1)
 
-            label_np = _label.cpu().data.numpy()
+            label_np = label.cpu().data.numpy()
             score_np = score_act[0].cpu().data.numpy()
 
             pred_np = np.zeros_like(score_np)
@@ -91,105 +92,106 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
 
             cas = utils.minmax_norm(cas_softmax * feat_magnitudes)
 
-            pred = np.where(score_np >= config.class_thresh)[0]
-
-            if len(pred) == 0:
-                pred = np.array([np.argmax(score_np)])
-            cas_pred = cas[0].cpu().numpy()[:, pred]
-            cas_pred = np.reshape(cas_pred, (num_segments, -1, 1))
-            cas_pred = utils.upgrade_resolution(cas_pred, config.scale)
-
-            proposal_dict = {}
-
-            feat_magnitudes_np = feat_magnitudes[0].cpu().data.numpy()[:, pred]
-            feat_magnitudes_np = np.reshape(feat_magnitudes_np, (num_segments, -1, 1))
-            feat_magnitudes_np = utils.upgrade_resolution(feat_magnitudes_np, config.scale)
-
-            for i in range(len(config.act_thresh_cas)):
-                cas_temp = cas_pred.copy()
-                zero_location = np.where(cas_temp[:, :, 0] < config.act_thresh_cas[i])
-                cas_temp[zero_location] = 0
-
-                seg_list = []
-                for c in range(len(pred)):
-                    pos = np.where(cas_temp[:, c, 0] > 0)
-                    seg_list.append(pos)
-
-                proposals = utils.get_proposal_oic(seg_list, cas_temp, score_np, pred, config.scale, \
-                                vid_num_seg, config.feature_fps, num_segments)
-
-                for i in range(len(proposals)):
-                    class_id = proposals[i][0][0]
-
-                    if class_id not in proposal_dict.keys():
-                        proposal_dict[class_id] = []
-
-                    proposal_dict[class_id] += proposals[i]
-
-            for i in range(len(config.act_thresh_magnitudes)):
-                cas_temp = cas_pred.copy()
-
-                feat_magnitudes_np_temp = feat_magnitudes_np.copy()
-
-                zero_location = np.where(feat_magnitudes_np_temp[:, :, 0] < config.act_thresh_magnitudes[i])
-                feat_magnitudes_np_temp[zero_location] = 0
-
-                seg_list = []
-                for c in range(len(pred)):
-                    pos = np.where(feat_magnitudes_np_temp[:, c, 0] > 0)
-                    seg_list.append(pos)
-
-                proposals = utils.get_proposal_oic(seg_list, cas_temp, score_np, pred, config.scale, \
-                                vid_num_seg, config.feature_fps, num_segments)
-
-                for i in range(len(proposals)):
-                    class_id = proposals[i][0][0]
-
-                    if class_id not in proposal_dict.keys():
-                        proposal_dict[class_id] = []
-
-                    proposal_dict[class_id] += proposals[i]
-
-            final_proposals = []
-            for class_id in proposal_dict.keys():
-                final_proposals.append(utils.nms(proposal_dict[class_id], 0.6))
-
-            final_res['results'][vid_name[0]] = utils.result2json(final_proposals)
-
             # Plot and create feature dict
             # For WTAL head
-            gt_ = gt[vid_name[0]]
-            cas_ = utils.get_cas(gt_, cas)
-            wtal_pred_dict[vid_name[0]] = cas_
+            gt_vid = gt[vid_name[0]]
+            cas = utils.get_cas(gt_vid, cas)
+            wtal_pred_dict[vid_name[0]] = cas
             if save:
-                plot_pred(cas_, gt_, vid_name[0]+'_wtal_inner_', savefig_path)
+                plot_pred(cas, gt_vid, vid_name[0]+'_wtal_inner_', savefig_path)
             # For Supervision head
             if sup_cas_softmax is not None:
                 cas = sup_cas_softmax
-                cas_ = utils.get_cas(gt_, cas)
-                sup_pred_dict[vid_name[0]] = cas_
+                cas = utils.get_cas(gt_vid, cas)
+                sup_pred_dict[vid_name[0]] = cas
                 if save:
-                    plot_pred(cas_, gt_, vid_name[0]+'_inner_seg_', savefig_path)
+                    plot_pred(cas, gt_vid, vid_name[0]+'_inner_seg_', savefig_path)
+
+            if mAP:
+                pred = np.where(score_np >= config.class_thresh)[0]
+
+                if len(pred) == 0:
+                    pred = np.array([np.argmax(score_np)])
+                cas_pred = cas[0].cpu().numpy()[:, pred]
+                cas_pred = np.reshape(cas_pred, (num_segments, -1, 1))
+                cas_pred = utils.upgrade_resolution(cas_pred, config.scale)
+
+                proposal_dict = {}
+
+                feat_magnitudes_np = feat_magnitudes[0].cpu().data.numpy()[:, pred]
+                feat_magnitudes_np = np.reshape(feat_magnitudes_np, (num_segments, -1, 1))
+                feat_magnitudes_np = utils.upgrade_resolution(feat_magnitudes_np, config.scale)
+
+                for i in range(len(config.act_thresh_cas)):
+                    cas_temp = cas_pred.copy()
+                    zero_location = np.where(cas_temp[:, :, 0] < config.act_thresh_cas[i])
+                    cas_temp[zero_location] = 0
+
+                    seg_list = []
+                    for c in range(len(pred)):
+                        pos = np.where(cas_temp[:, c, 0] > 0)
+                        seg_list.append(pos)
+
+                    proposals = utils.get_proposal_oic(seg_list, cas_temp, score_np, pred, config.scale, \
+                                    vid_num_seg, config.feature_fps, num_segments)
+
+                    for i in range(len(proposals)):
+                        class_id = proposals[i][0][0]
+
+                        if class_id not in proposal_dict.keys():
+                            proposal_dict[class_id] = []
+
+                        proposal_dict[class_id] += proposals[i]
+
+                for i in range(len(config.act_thresh_magnitudes)):
+                    cas_temp = cas_pred.copy()
+
+                    feat_magnitudes_np_temp = feat_magnitudes_np.copy()
+
+                    zero_location = np.where(feat_magnitudes_np_temp[:, :, 0] < config.act_thresh_magnitudes[i])
+                    feat_magnitudes_np_temp[zero_location] = 0
+
+                    seg_list = []
+                    for c in range(len(pred)):
+                        pos = np.where(feat_magnitudes_np_temp[:, c, 0] > 0)
+                        seg_list.append(pos)
+
+                    proposals = utils.get_proposal_oic(seg_list, cas_temp, score_np, pred, config.scale, \
+                                    vid_num_seg, config.feature_fps, num_segments)
+
+                    for i in range(len(proposals)):
+                        class_id = proposals[i][0][0]
+
+                        if class_id not in proposal_dict.keys():
+                            proposal_dict[class_id] = []
+
+                        proposal_dict[class_id] += proposals[i]
+
+                final_proposals = []
+                for class_id in proposal_dict.keys():
+                    final_proposals.append(utils.nms(proposal_dict[class_id], 0.6))
+
+                final_res['results'][vid_name[0]] = utils.result2json(final_proposals)
 
         if save:
             plot_node(nodes_lst, nodes_label_lst, class_lst, os.path.abspath(config.output_path))
 
-        test_acc = num_correct / num_total
+        if mAP:
+            json_path = os.path.join(config.output_path, 'inner_result.json')
+            with open(json_path, 'w') as f:
+                json.dump(final_res, f)
+                f.close()
+            tIoU_thresh = np.linspace(0.1, 0.7, 7)
+            anet_detection = ANETdetection(config.gt_path,
+                                        json_path,
+                                        subset='train',
+                                        tiou_thresholds=tIoU_thresh,
+                                        verbose=False,
+                                        check_status=False)
+            # mAP, average_mAP, fmAP, average_fmAP = anet_detection.evaluate()
+            mAP, average_mAP = anet_detection.evaluate()
 
-        json_path = os.path.join(config.output_path, 'inner_result.json')
-        with open(json_path, 'w') as f:
-            json.dump(final_res, f)
-            f.close()
-
-        tIoU_thresh = np.linspace(0.1, 0.7, 7)
-        anet_detection = ANETdetection(config.gt_path,
-                                       json_path,
-                                       subset='train',
-                                       tiou_thresholds=tIoU_thresh,
-                                       verbose=False,
-                                       check_status=False)
-        # mAP, average_mAP, fmAP, average_fmAP = anet_detection.evaluate()
-        mAP, average_mAP = anet_detection.evaluate()
+            test_acc = num_correct / num_total
 
         # mIoU
         if config.test_head == 'sup' and config.supervision != 'weak':
@@ -200,40 +202,42 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
             test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, wtal_pred_dict, cls_thres)
 
         # Update logger
-        logger.log_value('Test accuracy', test_acc, step)
-        logger.log_value('Average mAP', average_mAP, step)
-        for i in range(tIoU_thresh.shape[0]):
-            logger.log_value('mAP@{:.1f}'.format(tIoU_thresh[i]), mAP[i], step)
+        if mAP:
+            logger.log_value('Test accuracy', test_acc, step)
+            logger.log_value('Average mAP', average_mAP, step)
+            for i in range(tIoU_thresh.shape[0]):
+                logger.log_value('mAP@{:.1f}'.format(tIoU_thresh[i]), mAP[i], step)
 
         logger.log_value('Average mIoU', test_iou.mean(), step)
         for i in range(len(cls_thres)):
             logger.log_value('mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
             
-        logger.log_value('Average bkg mIoU', test_iou.mean(), step)
+        logger.log_value('Average bkg mIoU', bkg_iou.mean(), step)
         for i in range(len(cls_thres)):
             logger.log_value('bkg_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
 
-        logger.log_value('Average act mIoU', test_iou.mean(), step)
+        logger.log_value('Average act mIoU', act_iou.mean(), step)
         for i in range(len(cls_thres)):
             logger.log_value('act_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
 
 
         # Update test info
         test_info['step'].append(step)
-        test_info['test_acc'].append(test_acc)
-        test_info['average_mAP'].append(average_mAP)
-        for i in range(tIoU_thresh.shape[0]):
-            test_info['mAP@{:.1f}'.format(tIoU_thresh[i])].append(mAP[i])
+        if mAP:
+            test_info['test_acc'].append(test_acc)
+            test_info['average_mAP'].append(average_mAP)
+            for i in range(tIoU_thresh.shape[0]):
+                test_info['mAP@{:.1f}'.format(tIoU_thresh[i])].append(mAP[i])
 
         test_info['average_mIoU'].append(test_iou.mean())
         for i in range(len(cls_thres)):
             test_info['mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(test_iou[i])
 
-        test_info['average_bkg_mIoU'].append(test_iou.mean())
+        test_info['average_bkg_mIoU'].append(bkg_iou.mean())
         for i in range(len(cls_thres)):
             test_info['bkg_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(bkg_iou[i])
 
-        test_info['average_act_mIoU'].append(test_iou.mean())
+        test_info['average_act_mIoU'].append(act_iou.mean())
         for i in range(len(cls_thres)):
             test_info['act_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(act_iou[i])
 

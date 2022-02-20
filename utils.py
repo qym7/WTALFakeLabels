@@ -68,16 +68,17 @@ def grouping(arr):
     return np.split(arr, np.where(np.diff(arr) != 1)[0] + 1)
 
 
-def save_best_record_thumos(test_info, file_path, cls_thres, best_thres=None):
+def save_best_record_thumos(test_info, file_path, cls_thres, best_thres=None, mAP=False):
     fo = open(file_path, "w")
     fo.write("Step: {}\n".format(test_info["step"][-1]))
-    fo.write("Test_acc: {:.4f}\n".format(test_info["test_acc"][-1]))
-    fo.write("average_mAP: {:.4f}\n".format(test_info["average_mAP"][-1]))
+    if mAP:
+        fo.write("Test_acc: {:.4f}\n".format(test_info["test_acc"][-1]))
+        fo.write("average_mAP: {:.4f}\n".format(test_info["average_mAP"][-1]))
 
-    tIoU_thresh = np.linspace(0.1, 0.7, 7)
-    for i in range(len(tIoU_thresh)):
-        fo.write("mAP@{:.1f}: {:.4f}\n".format(tIoU_thresh[i],
-                 test_info["mAP@{:.1f}".format(tIoU_thresh[i])][-1]))
+        tIoU_thresh = np.linspace(0.1, 0.7, 7)
+        for i in range(len(tIoU_thresh)):
+            fo.write("mAP@{:.1f}: {:.4f}\n".format(tIoU_thresh[i],
+                    test_info["mAP@{:.1f}".format(tIoU_thresh[i])][-1]))
 
     # cls_thres = np.arange(0.1, 1, 0.1)
     fo.write("average_mIoU: {:.4f}\n".format(test_info["average_mIoU"][-1]))
@@ -300,9 +301,9 @@ def group_node(x, gt, thres1=0.2, thres2=0.4):
     nodes_label = []
     nodes_pos = []
     vid_label = []
-    for i, (feat, gt_vid) in enumerate(zip(x.detach().cpu().numpy(), x_label)):  # 迭代循环一类下的N个视频，由于每个视频产生的节点数不同，只能通过循环处理
-        split_pos = np.where(np.diff(gt_vid) != 0)[0] + 1
-        split_gt = np.split(gt_vid, split_pos)
+    for i, (feat, label) in enumerate(zip(x.detach().cpu().numpy(), x_label)):  # 迭代循环一类下的N个视频，由于每个视频产生的节点数不同，只能通过循环处理
+        split_pos = np.where(np.diff(label) != 0)[0] + 1
+        split_gt = np.split(label, split_pos)
         split_x = np.split(feat, split_pos)
         bg_pos = 0
         for j in range(len(split_pos)+1):
@@ -318,3 +319,13 @@ def group_node(x, gt, thres1=0.2, thres2=0.4):
                 bg_pos = gt.shape[-1]
 
     return np.stack(nodes), np.stack(nodes_label), nodes_pos, vid_label
+
+def sim_matrix(a, b, eps=1e-8):
+    """
+    added eps for numerical stability
+    """
+    a_n, b_n = a.norm(dim=1)[:, None], b.norm(dim=1)[:, None]
+    a_norm = a / torch.clamp(a_n, min=eps)
+    b_norm = b / torch.clamp(b_n, min=eps)
+    sim_mt = torch.mm(a_norm, b_norm.transpose(0, 1))
+    return sim_mt

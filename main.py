@@ -11,6 +11,7 @@ from model import *
 from tensorboard_logger import Logger
 from gcn_thumos_features import *
 from thumos_features import *
+from loss import *
 
 from eval_utils import ANNOT_PATH
 
@@ -141,7 +142,8 @@ if __name__ == "__main__":
                     config.test_dataset,
                     config.seed)),
                     cls_thres=cls_thres,
-                    best_thres=best_thres)
+                    best_thres=best_thres,
+                    mAP=False)
 
             torch.save(net.state_dict(), os.path.join(args.model_path, \
                 "best_iou_model_seed_{}.pkl".format(config.seed)))
@@ -150,19 +152,20 @@ if __name__ == "__main__":
         logger.log_value('Best mIoU high threshold', best_thres[1], step)
         logger.log_value('Best mIoU', best_mIoU, step)
 
-        # save model by mAP
-        if test_info["average_mAP"][-1] > best_mAP:
-            best_mAP = test_info["average_mAP"][-1]
+        # # save model by mAP
+        # if test_info["average_mAP"][-1] > best_mAP:
+        #     best_mAP = test_info["average_mAP"][-1]
 
-            print('save by mAP')
-            utils.save_best_record_thumos(test_info,
-                os.path.join(config.output_path, "best_mAP_record_{}_seed_{}.txt".format(
-                    config.test_dataset,
-                    config.seed)),
-                cls_thres=cls_thres)
+        #     print('save by mAP')
+        #     utils.save_best_record_thumos(test_info,
+        #         os.path.join(config.output_path, "best_mAP_record_{}_seed_{}.txt".format(
+        #             config.test_dataset,
+        #             config.seed)),
+        #         cls_thres=cls_thres,
+        #         mAP=False)
 
-            torch.save(net.state_dict(), os.path.join(args.model_path, \
-                "best_map_model_seed_{}.pkl".format(config.seed)))
+        #     torch.save(net.state_dict(), os.path.join(args.model_path, \
+        #         "best_map_model_seed_{}.pkl".format(config.seed)))
 
         print(config.model_path.split('/')[-1],
               '--Average mIoU ', round(test_info['average_mIoU'][-1], 4),
@@ -173,8 +176,9 @@ if __name__ == "__main__":
               '--Best mIoU high Thres ', round(best_thres[1], 4),
               '--Bkg mIoU ', round(best_bkg_mIoU, 4),
               '--Act mIoU ', round(best_act_mIoU, 4),
-              '--Average mAP', round(test_info["average_mAP"][-1], 4),
-              '--Best mAP ', round(best_mAP, 4),)
+            #   '--Average mAP', round(test_info["average_mAP"][-1], 4),
+            #   '--Best mAP ', round(best_mAP, 4),
+              )
         
         if step % 100 == 0:
             torch.save(net.state_dict(), os.path.join(args.model_path, \
@@ -184,4 +188,5 @@ if __name__ == "__main__":
         os.path.join(config.output_path, "full_record_{}_seed_{}.txt".format(config.test_dataset,
                                                                              config.seed)),
         cls_thres=cls_thres,
-        best_thres=best_thres)
+        best_thres=best_thres,
+        mAP=False)
