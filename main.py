@@ -74,7 +74,9 @@ if __name__ == "__main__":
     with open(os.path.join(ANNOT_PATH, '{}_gt_25.pickle'.format(config.test_dataset)), 'rb') as f:
         gt = pickle.load(f)
 
+    # 使用单阈值
     thres = np.arange(0.1, 1, 0.1)
+    # # 使用双阈值
     # cls_thres = [(round(t_l, 2), round(t_h, 2)) for i, t_l in enumerate(thres) for t_h in thres[i:]]
     cls_thres = [(round(i, 2), round(i, 2)) for i in thres]
     test_info = {"step": [], "test_acc": [],

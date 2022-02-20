@@ -44,28 +44,27 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
         for i in range(len(test_loader.dataset)):
 
             # GCN inner video merge version
-            _data, _label, _gt, vid_name, vid_num_seg = next(load_iter)
-            _data = _data.reshape(1, 1, _data.shape[-2], _data.shape[-1]).cuda()
-            _gt = _gt.reshape(1, 1, _gt.shape[-2], _gt.shape[-1]).cuda()
-            _label = _label.reshape(-1, _label.shape[-1]).cuda()
+            data, label, gt, vid_name, vid_num_seg = next(load_iter)
+            data =data.reshape(1, 1, data.shape[-2], data.shape[-1]).cuda()
+            gt = gt.reshape(1, 1, gt.shape[-2], gt.shape[-1]).cuda()
+            label = label.reshape(-1, _label.shape[-1]).cuda()
 
-            new_data = torch.zeros_like(_data.reshape(-1, _data.shape[-2], _data.shape[-1]))
+            new_data = torch.zeros_like(_data.reshape(-1, data.shape[-2], data.shape[-1]))
             for index in torch.where(_label[0]==1)[0]:
-                cur_data, cur_nodes, cur_nodes_label, _ = gcnn(_data, _gt, [index], eval=True)
+                cur_data, cur_nodes, cur_nodes_label, _ = gcnn(data, gt, [index], eval=True)
                 new_data += cur_data
                 nodes_lst.append(torch.stack(cur_nodes)[0].detach().cpu().numpy())
                 nodes_label_lst.append(torch.stack(cur_nodes_label)[0].detach().cpu().numpy())
                 class_lst.append(np.ones(len(cur_nodes[0]))*(index.detach().cpu().item()))
-            _data = new_data/len(torch.where(_label[0]==1)[0])
+            data = new_data/len(torch.where(_label[0]==1)[0])
             
-            _data = _data.detach()
-            _gt = _gt.detach()
+            data = data.detach()
+            gt = gt.detach()
 
             # # normal version
-            # _data, _label, _, vid_name, vid_num_seg = next(load_iter)
-
-            # _data = _data.cuda()
-            # _label = _label.cuda()
+            # data, label, _, vid_name, vid_num_seg = next(load_iter)
+            # data = data.cuda()
+            # label = label.cuda()
 
             vid_num_seg = vid_num_seg[0].cpu().item()
             num_segments = _data.shape[1]

@@ -210,23 +210,21 @@ class UM_loss(nn.Module):
 def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn, criterion, criterion_gcnn, logger, step, net_teacher, m, nodes_dict):
     net.train()
 
-    _data, _label, _gt, vid_names, _, index = next(loader_iter)
-    N = _data.shape[1]
-    _data = _data.cuda()  # reshaped in net
-    _gt = _gt.cuda()  # reshaped in net
-    _label = _label.reshape(-1, _label.shape[-1]).cuda()
+    data, label, gt, vid_names, _, index = next(loader_iter)
+    N = data.shape[1]
+    data = data.cuda()  # reshaped in net
+    gt = gt.cuda()  # reshaped in net
+    label = label.reshape(-1, label.shape[-1]).cuda()
 
-    # new_data, nodes, nodes_label, vids_label = gcnn(_data, _gt, index, vid_names)
-    # _data = (_data.reshape(-1, _data.shape[-2], _data.shape[-1]).detach() + new_data) / 2
-    _data, nodes, nodes_label, vids_label = gcnn(_data, _gt, index, vid_names)
+    data, nodes, nodes_label, vids_label = gcnn(data, gt, index, vid_names)
     cost_gcnn = criterion_gcnn(nodes, nodes_label)
 
-    _data = _data.detach()
-    _gt = _gt.reshape(-1, _gt.shape[-2], _gt.shape[-1]).detach()
-    score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax = net(_data)
+    data = data.detach()
+    gt = gt.reshape(-1, _gt.shape[-2], _gt.shape[-1]).detach()
+    score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax = net(data)
 
-    cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, _label,
-                            _gt, sup_cas_softmax, step=step)
+    cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, label,
+                           gt, sup_cas_softmax, step=step)
     loss['loss_gcnn'] = cost_gcnn
     print("loss_gcnn", cost_gcnn.detach().cpu().item())
 

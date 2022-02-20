@@ -77,18 +77,23 @@ class GCN(nn.Module):
         nodes_label = []
         vids_label = []
         new_x = torch.zeros_like(x)
-        for i in range(len(x)):  # bs * N * T * 20, bs也意味着有bs类的视频，每类视频有N个
+         # bs * N * T * 20, bs也意味着有bs类的视频，每类视频有N个
+        for i in range(len(x)):
             vid_cls = x[i]
             gt_cls = gt[i, :, :, index[i]]  # N * T
-            nodes_, nodes_label_, nodes_pos_, vid_label_ = group_node(vid_cls, gt_cls)  # 由于只有在同类视频里产生节点图，所以需要迭代循环所有类
+            # 由于只有在同类视频里产生节点图，所以需要迭代循环所有类
+            nodes_, nodes_label_, nodes_pos_, vid_label_ = group_node(vid_cls, gt_cls)
             adj = generate_adj_matrix(nodes_label_)
             # pass to GCN
-            x_ = self.gcn_module(torch.from_numpy(nodes_).detach().cuda(), adj)  # 根据gcn处理后的node和node在特征中的位置更新features
+            x_ = self.gcn_module(torch.from_numpy(nodes_).detach().cuda(), adj)
+            # 根据gcn处理后的node和node在特征中的位置更新features
             for j, pos in enumerate(nodes_pos_):
                 new_x[i, pos[0], pos[1]:pos[2]] = x_[j].repeat(pos[2]-pos[1], 1).clone()
-            nodes.append(x_)  # 产生N个同类视频的节点
+            # 加入N个同类视频的节点
+            nodes.append(x_)
             vids_label.append(torch.Tensor(vid_label_))
-            nodes_label.append(torch.from_numpy(nodes_label_).cuda())  # 产生上述节点对应标签，1为action，0为bkg，-1为不确定
+            # 产生上述节点对应标签，1为action，0为bkg，-1为不确定
+            nodes_label.append(torch.from_numpy(nodes_label_).cuda())
 
         new_x = new_x.reshape(-1, x.shape[-2], x.shape[-1])
 
