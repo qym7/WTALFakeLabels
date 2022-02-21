@@ -43,7 +43,6 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
         else:
             nodes_bank[20] = torch.cat((t_bkg_nodes, nodes_bank[20]))
         nodes_bank[20] = nodes_bank[20][:NODES_NUMBER[20]]
-        print(len(nodes_bank[not_torch_idx]), len(nodes_bank[20]))
 
     # Calculate Contrastive Loss and Back-propagate GCNN
     cost_gcnn = criterion_gcnn(nodes, nodes_label, index, nodes_bank)

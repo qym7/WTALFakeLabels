@@ -110,6 +110,8 @@ class GCN(nn.Module):
             # VERSION: filter1
             cur_sim = sim_matrix(nodes_, nodes_)
             mask = cur_sim < 0.7
+            print('MODEL SIMILARITY FILTER false nbr', mask.sum().cpu().item(),
+                  cur_sim.shape[0]*cur_sim.shape[0])
             cur_sim = torch.exp(-cur_sim/0.1)
             cur_sim[mask] = 0
             cur_sim = 4 * cur_sim / (cur_sim.sum(dim=1)+1e-6)

@@ -60,8 +60,8 @@ class GCNN_loss(nn.Module):
         similarity_outer_cls = similarity_outer_cls/(act_bkg_mask.sum(dim=1)+1e-6)
 
         # filter similarity
-        false_nodes = similarity_outer_cls >= similarity_inner_cls
-        print('false nbr', false_nodes.sum(), len(nodes))
+        false_nodes = similarity_outer_cls >= similarity_inner_cls - 0.1
+        print('LOSS FILTER false nbr', false_nodes.sum(), len(nodes))
         nodes = nodes[~false_nodes]
         nodes_label = nodes_label[~false_nodes]
         similarity_matrix = similarity_matrix[~false_nodes]
