@@ -28,7 +28,7 @@ class GCNN_loss(nn.Module):
             available_nodes = torch.cat([nodes_bank[i] for i in range(21)
                                          if len(nodes_bank[i])>0]).cuda()
             availabel_nodes_label = torch.cat([torch.ones(nodes_bank[i].shape[0]).cuda()*i
-                                               for i in range(21) if len(nodes_bank[i])>0]).cuda()
+                                    for i in range(21) if len(nodes_bank[i])>0]).cuda()
 
          # delete uncertain nodes
         nodes = torch.cat(nodes)[node_mask]

@@ -45,9 +45,9 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
         nodes_bank[20] = nodes_bank[20][:NODES_NUMBER[20]]
     # Calculate Contrastive Loss and Back-propagate GCNN
     cost_gcnn = criterion_gcnn(nodes, nodes_label, index, nodes_bank)
-    # optimizer_gcnn.zero_grad()
-    # cost_gcnn.backward()
-    # optimizer_gcnn.step()
+    optimizer_gcnn.zero_grad()
+    cost_gcnn.backward()
+    optimizer_gcnn.step()
 
     # Isolate gradient between GCNN and WTAL model
     label = label.reshape(-1, label.shape[-1]).to(torch.float32).detach()

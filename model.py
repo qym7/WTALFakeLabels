@@ -78,6 +78,44 @@ class GCN(nn.Module):
             nn.ReLU()
         )
 
+    def group_node(self, x, gt, thres1=0.2, thres2=0.4):
+        '''
+        gt: bs * T * 20
+        return:
+        nodes: list of bs elements, 每一个元素是Ni*2048的矩阵，表示N个同类视频中的节点
+        '''
+        x_label = torch.ones_like(gt)
+        x_label[gt>thres2] = 2
+        x_label[gt<=thres1] = 0
+        nodes = []
+        nodes_label = []
+        nodes_pos = []
+        vid_label = []
+        # 迭代循环一类下的N个视频，由于每个视频产生的节点数不同，只能通过循环处理
+        for i, (feat, label) in enumerate(zip(x, x_label)):
+            split_pos = torch.where(torch.diff(label) != 0)[0] + 1
+            split_pos = split_pos.tolist()
+            if len(split_pos) == 0 or split_pos[-1] < gt.shape[-1]:
+                split_pos += [gt.shape[-1]]
+            split_pos = [split_pos[0]] + [split_pos[i+1] - split_pos[i]
+                         for i in range(len(split_pos)-1)]
+            split_gt = torch.split(label, split_pos)
+            split_x = torch.split(feat, split_pos)
+            bg_pos = 0
+            for j in range(len(split_pos)):
+                nodes_label.append(split_gt[j].mean())
+                node = split_x[j].mean(axis=0)
+                nodes.append(node)
+                vid_label.append(i)
+                if j < len(split_pos):
+                    nodes_pos.append((i, bg_pos, bg_pos+len(split_x[j])))
+                    bg_pos += len(split_x[j])
+                else:
+                    nodes_pos.append((i, bg_pos, gt.shape[-1]))
+                    bg_pos = gt.shape[-1]
+
+        return torch.stack(nodes), torch.stack(nodes_label), nodes_pos, vid_label
+
     def forward(self, x, gt, index, eval=False):
         N, n, T, dim = x.shape
         features = x.reshape(-1, T, dim).permute(0, 2, 1)
@@ -93,12 +131,30 @@ class GCN(nn.Module):
             vids = features[i]
             gt_cls = gt[i, :, :, index[i]]  # N * T
             # 由于只有在同类视频里产生节点图，所以需要迭代循环所有类
-            nodes_, nodes_label_, nodes_pos_, vid_label_ = group_node(vids, gt_cls)
-            adj = generate_adj_matrix(nodes_label_)
-            nodes_label_ = torch.from_numpy(nodes_label_).cuda()
-            nodes_ = torch.from_numpy(nodes_).cuda()
+            nodes_, nodes_label_, nodes_pos_, vid_label_ = self.group_node(vids, gt_cls)
+            adj_cls, adj_unc = generate_adj_matrix(nodes_label_.detach().cpu().numpy())
+            nodes_label_ = nodes_label_
+            nodes_ = nodes_
+            # add edge weight
+            # # VERSION: weighted1
+            # cur_sim = torch.exp(-sim_matrix(nodes_, nodes_)/0.02)
+            # cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
+            # # VERSION: weighted2
+            # cur_sim = torch.exp(-sim_matrix(nodes_, nodes_)/0.1)
+            # cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
+            # # VERSION: weighted3
+            # cur_sim = torch.exp(sim_matrix(nodes_, nodes_)/0.3)
+            # cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
+            # VERSION: filter1
+            cur_sim = sim_matrix(nodes_, nodes_)
+            mask = cur_sim < 0.7
+            cur_sim = torch.exp(-cur_sim/0.1)
+            cur_sim[mask] = 0
+            cur_sim = 4 * cur_sim / (cur_sim.sum(dim=1)+1e-6)
+
+            adj = cur_sim.detach().cpu().numpy() * adj_cls + adj_unc
             # pass to GCN
-            x_ = self.gcn_module(nodes_.detach(), adj)
+            x_ = self.gcn_module(nodes_, adj)
             # 加入N个同类视频的节点
             nodes.append(x_)
             # 产生上述节点对应标签，2为action，0为bkg，1为不确定
