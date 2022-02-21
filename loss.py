@@ -70,6 +70,7 @@ class GCNN_loss(nn.Module):
         # eliminate nodes of different type
         one_similarity_matrix = similarity_matrix.clone()
         one_similarity_matrix[~mask] = 1
+        one_similarity_matrix[one_similarity_matrix<=0.] = 1
 
         # argmin can not be propagated, detach in order to prevent abnormal results?
         pair_index = one_similarity_matrix.argmin(dim=1).detach()
@@ -81,7 +82,7 @@ class GCNN_loss(nn.Module):
     def forward(self, nodes, nodes_label, index, nodes_bank):
         nodes, pair_similarity, nodes_label, mask, similarity_matrix = self.construct_pairs(nodes, nodes_label, index, nodes_bank)
         loss = self.loss(nodes, pair_similarity, nodes_label, mask, similarity_matrix)
-        return loss * self.gcnn_weight
+        return loss * self.gcnn_weight, nodes, nodes_label
 
 
 class ContrastiveLoss(nn.Module):

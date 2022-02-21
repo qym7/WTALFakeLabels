@@ -26,6 +26,9 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
     
     with torch.no_grad():
         _, t_nodes, t_nodes_label = gcnn_teacher(data, gt, index, eval=False)
+        if step > 20:
+            # filter a cleaner node bank when node bank is not empty
+            _, t_nodes, t_nodes_label = criterion_gcnn(t_nodes, t_nodes_label, index, nodes_bank)
     for i in range(len(index)):
         not_torch_idx = index[i].detach().cpu().item()
         nodes_number = NODES_NUMBER[not_torch_idx]
@@ -45,7 +48,7 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
         nodes_bank[20] = nodes_bank[20][:NODES_NUMBER[20]]
 
     # Calculate Contrastive Loss and Back-propagate GCNN
-    cost_gcnn = criterion_gcnn(nodes, nodes_label, index, nodes_bank)
+    cost_gcnn, _, _ = criterion_gcnn(nodes, nodes_label, index, nodes_bank)
     optimizer_gcnn.zero_grad()
     cost_gcnn.backward()
     optimizer_gcnn.step()
