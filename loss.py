@@ -60,7 +60,7 @@ class GCNN_loss(nn.Module):
         similarity_outer_cls = similarity_outer_cls/(act_bkg_mask.sum(dim=1)+1e-6)
 
         # filter similarity
-        false_nodes = similarity_outer_cls >= similarity_inner_cls - 0.1
+        false_nodes = similarity_outer_cls >= similarity_inner_cls
         print('LOSS FILTER false nbr', false_nodes.sum(), len(nodes))
         nodes = nodes[~false_nodes]
         nodes_label = nodes_label[~false_nodes]
@@ -94,7 +94,7 @@ class ContrastiveLoss(nn.Module):
         nominator = torch.exp(pair_similarity / self.temperature)
         # Calculate negetive-pair similairy
         denominator = ((~mask).int()+1e-6) * torch.exp(similarity_matrix / self.temperature)
-        loss_partial = -torch.log(nominator / torch.sum(denominator, dim=1))
+        loss_partial = -torch.log(nominator / (torch.sum(denominator, dim=1))+1e-6)
         loss = torch.sum(loss_partial) / nodes.shape[0]
 
         return loss
