@@ -29,16 +29,18 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
         if step > 20:
             # filter a cleaner node bank when node bank is not empty
             _, t_nodes, t_nodes_label = criterion_gcnn(t_nodes, t_nodes_label, index, nodes_bank)
-        
+
     for i in range(len(index)):
         not_torch_idx = index[i].detach().cpu().item()
         nodes_number = NODES_NUMBER[not_torch_idx]
-        # filter4
+        # # filter4
         k = 25
         random_act_idx = torch.randperm(len(t_nodes))[:k]
         random_bkg_idx = torch.randperm(len(t_nodes))[:k]
         t_act_nodes = t_nodes[i][t_nodes_label[i]==2][random_act_idx]
         t_bkg_nodes = t_nodes[i][t_nodes_label[i]==0][random_bkg_idx]
+        # t_act_nodes = t_nodes[i][t_nodes_label[i]==2]
+        # t_bkg_nodes = t_nodes[i][t_nodes_label[i]==0]
         # update action nodes
         if len(nodes_bank[not_torch_idx]) == 0:
             nodes_bank[not_torch_idx] = t_act_nodes

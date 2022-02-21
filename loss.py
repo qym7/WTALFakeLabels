@@ -70,7 +70,6 @@ class GCNN_loss(nn.Module):
         # eliminate nodes of different type
         one_similarity_matrix = similarity_matrix.clone()
         one_similarity_matrix[~mask] = 1
-        one_similarity_matrix[one_similarity_matrix<=0.] = 1
 
         # argmin can not be propagated, detach in order to prevent abnormal results?
         pair_index = one_similarity_matrix.argmin(dim=1).detach()
