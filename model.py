@@ -98,15 +98,15 @@ class GCN(nn.Module):
             nodes_label_ = torch.from_numpy(nodes_label_).cuda()
             nodes_ = torch.from_numpy(nodes_).cuda()
             # add edge weight
-            # # VERSION: weighted1
-            # cur_sim = torch.exp(-sim_matrix(nodes_, nodes_)/0.02)
-            # cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
+            # VERSION: weighted1
+            cur_sim = torch.exp(-sim_matrix(nodes_, nodes_)/0.02)
+            cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
             # # VERSION: weighted2
             # cur_sim = torch.exp(-sim_matrix(nodes_, nodes_)/0.1)
             # cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
-            # VERSION: weighted3
-            cur_sim = torch.exp(sim_matrix(nodes_, nodes_)/0.3)
-            cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
+            # # VERSION: weighted3
+            # cur_sim = torch.exp(sim_matrix(nodes_, nodes_)/0.3)
+            # cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
 
             adj = cur_sim.detach().cpu().numpy() * adj_cls + adj_unc
             # pass to GCN

@@ -1,6 +1,6 @@
-model_path='./models/UM-2-layer-cat-pos-weighted4'
-output_path='./outputs/UM-2-layer-cat-pos-weighted4'
-log_path='./glogs/UM-2-layer-cat-pos-weighted4'
+model_path='./models/UM-2-layer-cat-weighted1'
+output_path='./outputs/UM-2-layer-cat-weighted1'
+log_path='./glogs/UM-2-layer-cat-weighted1'
 seed=0
 data_path='/GPFS/public/AR/THUMOS14'
 supervision='self'

@@ -23,16 +23,27 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
     gcn_data, nodes, nodes_label = gcnn(data, gt, index, eval=False)
     # Update nodes_bank
     # Do not use grad to accelerate algorithm
+    # Get GCNN feature
     with torch.no_grad():
-        _, t_nodes, _ = gcnn_teacher(data, gt, index, eval=False)
+        _, t_nodes, t_nodes_label = gcnn_teacher(data, gt, index, eval=False)
     for i in range(len(index)):
         not_torch_idx = index[i].detach().cpu().item()
         nodes_number = NODES_NUMBER[not_torch_idx]
+        t_act_nodes = t_nodes[i][t_nodes_label[i]==2]
+        t_bkg_nodes = t_nodes[i][t_nodes_label[i]==0]
+
+        # update action nodes
         if len(nodes_bank[not_torch_idx]) == 0:
-            nodes_bank[not_torch_idx] = t_nodes[i]
+            nodes_bank[not_torch_idx] = t_act_nodes
         else:
-            nodes_bank[not_torch_idx] = torch.cat((t_nodes[i], nodes_bank[not_torch_idx]))
+            nodes_bank[not_torch_idx] = torch.cat((t_act_nodes, nodes_bank[not_torch_idx]))
         nodes_bank[not_torch_idx] = nodes_bank[not_torch_idx][:nodes_number]
+        # update bkg nodes
+        if len(nodes_bank[20]) == 0:
+            nodes_bank[20] = t_bkg_nodes
+        else:
+            nodes_bank[20] = torch.cat((t_bkg_nodes, nodes_bank[20]))
+        nodes_bank[20] = nodes_bank[20][:NODES_NUMBER[20]]
 
     # Calculate Contrastive Loss and Back-propagate GCNN
     cost_gcnn = criterion_gcnn(nodes, nodes_label, index, nodes_bank)
