@@ -62,7 +62,7 @@ class GCNN_loss(nn.Module):
         # filter similarity
         false_nodes = similarity_outer_cls >= similarity_inner_cls
         print('false label type', torch.unique(nodes_label[false_nodes]))
-        print('LOSS FILTER false nbr', false_nodes.sum(), len(nodes))
+        print('Filter during loss (bank/backward)', false_nodes.sum(), len(nodes))
         nodes = nodes[~false_nodes]
         nodes_label = nodes_label[~false_nodes]
         similarity_matrix = similarity_matrix[~false_nodes]

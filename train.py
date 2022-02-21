@@ -47,7 +47,6 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
         t_act_nodes = t_nodes[t_nodes_label==not_torch_idx]
         # random_act_idx = torch.randperm(len(t_act_nodes))[:k]
         # t_act_nodes = t_act_nodes[random_act_idx]
-        print('act', t_act_nodes.shape[0])
         # update action nodes
         if len(nodes_bank[not_torch_idx]) == 0:
             nodes_bank[not_torch_idx] = t_act_nodes
@@ -58,7 +57,6 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
     t_bkg_nodes = t_nodes[t_nodes_label==20]
     # random_bkg_idx = torch.randperm(len(t_bkg_nodes))[:k]
     # t_bkg_nodes = t_bkg_nodes[random_bkg_idx]
-    print('bkg', t_bkg_nodes.shape[0])
     if len(nodes_bank[20]) == 0:
         nodes_bank[20] = t_bkg_nodes
     else:

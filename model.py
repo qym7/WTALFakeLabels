@@ -95,7 +95,7 @@ class GCN(nn.Module):
         for i, (feat, label) in enumerate(zip(x, x_label)):
             split_pos = torch.where(torch.diff(label) != 0)[0] + 1
             split_pos = split_pos.tolist()
-            if split_pos[-1] < gt.shape[-1]:
+            if len(split_pos) == 0 or split_pos[-1] < gt.shape[-1]:
                 split_pos += [gt.shape[-1]]
             split_pos = [split_pos[0]] + [split_pos[i+1] - split_pos[i]
                          for i in range(len(split_pos)-1)]
@@ -148,6 +148,8 @@ class GCN(nn.Module):
             # VERSION: filter1
             cur_sim = sim_matrix(nodes_, nodes_)
             mask = cur_sim < 0.7
+            if not eval:
+                print('Filter during forward: ', mask.sum(), nodes_.shape[0]**2)
             cur_sim = torch.exp(-cur_sim/0.1)
             cur_sim[mask] = 0
             cur_sim = 4 * cur_sim / (cur_sim.sum(dim=1)+1e-6)
