@@ -1,6 +1,6 @@
-model_path='./models/UM-2-layer-cat-randomsample07'
-output_path='./outputs/UM-2-layer-cat-randomsample07'
-log_path='./glogs/UM-2-layer-cat-randomsample07'
+model_path='./models/UM-2-layer-cat-randomsample03'
+output_path='./outputs/UM-2-layer-cat-randomsample03'
+log_path='./glogs/UM-2-layer-cat-randomsample03'
 seed=0
 data_path='/GPFS/public/AR/THUMOS14'
 supervision='self'

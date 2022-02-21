@@ -282,7 +282,7 @@ def generate_adj_matrix(nodes_label):
     adj_unc = np.zeros((len(nodes_label), len(nodes_label)))
     
     # random sampling
-    sample_rate = 0.7
+    sample_rate = 0.3
     act_edges = random.sample(act_edges, k=min(int(sample_rate*len(act_edges)), 2))
     bkg_edges = random.sample(bkg_edges, k=min(int(sample_rate*len(bkg_edges)), 2))
     
