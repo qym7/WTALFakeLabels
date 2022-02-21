@@ -38,8 +38,37 @@ class GCNN_loss(nn.Module):
         # mask all pairs of same classes
         mask = nodes_label.unsqueeze(1) - availabel_nodes_label.unsqueeze(0)
         mask = mask == 0
-        one_similarity_matrix = similarity_matrix.clone()
+
+        # add filter to delete false pseudo_label
+        # VERSION: filter1
+        cur_similarity_matrix = similarity_matrix.clone()
+        cur_similarity_matrix[~mask] = 0
+        similarity_inner_cls = cur_similarity_matrix.sum(dim=1)
+        similarity_inner_cls = similarity_inner_cls/(mask.sum(dim=1)+1e-6)
+
+        nodes_act_bkg_label = nodes_label.clone()
+        nodes_act_bkg_label[nodes_act_bkg_label<20] = 0
+        nodes_act_bkg_label[nodes_act_bkg_label==20] = 1
+        availabel_act_bkg_nodes_label = availabel_nodes_label.clone()
+        availabel_act_bkg_nodes_label[availabel_act_bkg_nodes_label<20] = 0
+        availabel_act_bkg_nodes_label[availabel_act_bkg_nodes_label==20] = 1
+        act_bkg_mask = nodes_act_bkg_label.unsqueeze(1) - availabel_act_bkg_nodes_label.unsqueeze(0)
+        act_bkg_mask = act_bkg_mask == 0
+        cur_similarity_matrix = similarity_matrix.clone()
+        cur_similarity_matrix[act_bkg_mask] = 0
+        similarity_outer_cls = cur_similarity_matrix.sum(dim=1)
+        similarity_outer_cls = similarity_outer_cls/(act_bkg_mask.sum(dim=1)+1e-6)
+
+        # filter similarity
+        false_nodes = similarity_outer_cls >= similarity_inner_cls
+        print('false nbr', false_nodes.sum(), len(nodes))
+        nodes = nodes[~false_nodes]
+        nodes_label = nodes_label[~false_nodes]
+        similarity_matrix = similarity_matrix[~false_nodes]
+        mask = mask[~false_nodes]
+
         # eliminate nodes of different type
+        one_similarity_matrix = similarity_matrix.clone()
         one_similarity_matrix[~mask] = 1
 
         # argmin can not be propagated, detach in order to prevent abnormal results?
