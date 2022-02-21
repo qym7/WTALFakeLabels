@@ -1,6 +1,6 @@
-model_path='./models/UM-2-layer-cat-filter2'
-output_path='./outputs/UM-2-layer-cat-filter2'
-log_path='./glogs/UM-2-layer-cat-filter2'
+model_path='./models/UM-2-layer-cat-filter3'
+output_path='./outputs/UM-2-layer-cat-filter3'
+log_path='./glogs/UM-2-layer-cat-filter3'
 seed=0
 data_path='/GPFS/public/AR/THUMOS14'
 supervision='self'
