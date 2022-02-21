@@ -1,6 +1,6 @@
-model_path='./models/UM-2-layer-averageP'
-output_path='./outputs/UM-2-layer-averageP'
-log_path='./glogs/UM-2-layer-averageP'
+model_path='./models/UM-2-layer-cat-CONV'
+output_path='./outputs/UM-2-layer-cat-CONV'
+log_path='./glogs/UM-2-layer-cat-CONV'
 seed=0
 data_path='/GPFS/public/AR/THUMOS14'
 supervision='self'
@@ -20,4 +20,4 @@ test_head='wtal'
 dynamic='0'
 map='0'
 
-CUDA_VISIBLE_DEVICES=5 python -W ignore ./main.py --model_path ${model_path} --output_path ${output_path} --log_path ${log_path} --seed ${seed} --data_path ${data_path} --supervision ${supervision} --supervision_path ${supervision_path} --thres ${thres} --thres_down ${thres_down} --lmbd ${lmbd} --neg_lmbd ${neg_lmbd} --bkg_lmbd ${bkg_lmbd} --test_dataset ${test_dataset} --test_head ${test_head} --batch_size ${batch_size} --N ${N}  --gcnn_weight ${gcnn_weight} --dynamic ${dynamic} --map ${map}
+CUDA_VISIBLE_DEVICES=7 python -W ignore ./main.py --model_path ${model_path} --output_path ${output_path} --log_path ${log_path} --seed ${seed} --data_path ${data_path} --supervision ${supervision} --supervision_path ${supervision_path} --thres ${thres} --thres_down ${thres_down} --lmbd ${lmbd} --neg_lmbd ${neg_lmbd} --bkg_lmbd ${bkg_lmbd} --test_dataset ${test_dataset} --test_head ${test_head} --batch_size ${batch_size} --N ${N}  --gcnn_weight ${gcnn_weight} --dynamic ${dynamic} --map ${map}
