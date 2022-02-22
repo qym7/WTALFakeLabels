@@ -107,11 +107,12 @@ class GCN(nn.Module):
             # # VERSION: weighted3
             # cur_sim = torch.exp(sim_matrix(nodes_, nodes_)/0.3)
             # cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
-            # VERSION: weighted4
-            cur_sim = torch.exp(sim_matrix(nodes_, nodes_)/0.1)
-            cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
+            # # VERSION: weighted4
+            # cur_sim = torch.exp(sim_matrix(nodes_, nodes_)/0.1)
+            # cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
 
-            adj = cur_sim.detach().cpu().numpy() * adj_cls + adj_unc
+            # adj = cur_sim.detach().cpu().numpy() * adj_cls + adj_unc
+            adj = adj_cls + adj_unc
             # pass to GCN
             x_ = self.gcn_module(nodes_.detach(), adj)
             # 加入N个同类视频的节点

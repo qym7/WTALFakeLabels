@@ -96,17 +96,17 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
             # Plot and create feature dict
             # For WTAL head
             gt_vid = gt[vid_name[0]]
-            cas = utils.get_cas(gt_vid, cas)
-            wtal_pred_dict[vid_name[0]] = cas
+            cas_ = utils.get_cas(gt_vid, cas)
+            wtal_pred_dict[vid_name[0]] = cas_
             if save:
-                plot_pred(cas, gt_vid, vid_name[0]+'_wtal_inner_', savefig_path)
+                plot_pred(cas_, gt_vid, vid_name[0]+'_wtal_inner_', savefig_path)
             # For Supervision head
             if sup_cas_softmax is not None:
                 cas = sup_cas_softmax
-                cas = utils.get_cas(gt_vid, cas)
-                sup_pred_dict[vid_name[0]] = cas
+                cas_ = utils.get_cas(gt_vid, cas)
+                sup_pred_dict[vid_name[0]] = cas_
                 if save:
-                    plot_pred(cas, gt_vid, vid_name[0]+'_inner_seg_', savefig_path)
+                    plot_pred(cas_, gt_vid, vid_name[0]+'_inner_seg_', savefig_path)
 
             if mAP:
                 pred = np.where(score_np >= config.class_thresh)[0]

@@ -30,9 +30,9 @@ if __name__ == "__main__":
 
     net = Model(config.len_feature, config.num_classes, 
                 config.r_act, config.r_bkg,
-                config.supervision!='weak')
+                False)
     net = net.cuda()
-    gcnn = GCN()
+    gcnn = GCN(config.len_feature)
     gcnn = gcnn.cuda()
 
     test_loader = data.DataLoader(
