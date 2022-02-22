@@ -71,7 +71,7 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
 
     # Isolate gradient between GCNN and WTAL model
     label = label.reshape(-1, label.shape[-1]).to(torch.float32).detach()
-    data = torch.cat([data, gcn_data], dim=-1)
+    # data = torch.cat([data, gcn_data], dim=-1)
     data = data.reshape(-1, data.shape[-2], data.shape[-1]).detach()
     gt = gt.reshape(-1, gt.shape[-2], gt.shape[-1]).detach()
     score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax = net(data)

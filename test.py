@@ -59,7 +59,7 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
                 class_lst.append(np.ones(len(cur_nodes[0]))*(index.detach().cpu().item()))
             gcn_data = gcn_data/len(torch.where(label[0]==1)[0])
 
-            data = torch.cat([data, gcn_data], dim=-1)
+            # data = torch.cat([data, gcn_data], dim=-1)
             data = data.reshape(-1, data.shape[-2], data.shape[-1]).detach()
             pseudo_label = pseudo_label.detach()
 

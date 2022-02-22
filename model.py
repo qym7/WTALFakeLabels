@@ -145,16 +145,32 @@ class GCN(nn.Module):
             # # VERSION: weighted3
             # cur_sim = torch.exp(sim_matrix(nodes_, nodes_)/0.3)
             # cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
-            # VERSION: filter1
+            # # VERSION: filter1
+            # cur_sim = sim_matrix(nodes_, nodes_)
+            # mask = cur_sim < 0.7
+            # cur_sim_cls = torch.exp(-cur_sim/0.1)
+            # if not eval:
+            #     print('Filter class edges: ', mask.sum(), nodes_.shape[0]**2)
+            # cur_sim_cls[mask] = 0
+            # cur_sim_cls = 4 * cur_sim_cls / (cur_sim_cls.sum(dim=1)+1e-6)
+            # mask = (torch.Tensor(adj_unc).cuda()) == 0
+            # # print(mask)
+            # # if not eval:
+            # #     print('Filter neighbor edges: ', mask.sum(), nodes_.shape[0]**2)
+            # cur_sim_unc = 2 * cur_sim
+            # cur_sim_unc[mask] = 0
+            # # print(cur_sim_unc[cur_sim_unc>0])
+            # adj = cur_sim_cls.detach().cpu().numpy() * adj_cls + cur_sim_unc.detach().cpu().numpy()*adj_unc
+            # # print(adj[adj>0])
+            # VERSION: normal
             cur_sim = sim_matrix(nodes_, nodes_)
-            mask = cur_sim < 0.7
-            if not eval:
-                print('Filter during forward: ', mask.sum(), nodes_.shape[0]**2)
-            cur_sim = torch.exp(-cur_sim/0.1)
-            cur_sim[mask] = 0
-            cur_sim = 4 * cur_sim / (cur_sim.sum(dim=1)+1e-6)
+            cur_sim_cls = torch.exp(-cur_sim/0.1)
+            cur_sim_cls = 4 * cur_sim_cls / (cur_sim_cls.sum(dim=1)+1e-6)
+            mask = (torch.Tensor(adj_unc).cuda()) == 0
+            cur_sim_unc = 2 * cur_sim
+            cur_sim_unc[mask] = 0
+            adj = cur_sim_cls.detach().cpu().numpy() * adj_cls + cur_sim_unc.detach().cpu().numpy()*adj_unc
 
-            adj = cur_sim.detach().cpu().numpy() * adj_cls + adj_unc
             # pass to GCN
             x_ = self.gcn_module(nodes_, adj)
             # 加入N个同类视频的节点
@@ -175,7 +191,7 @@ class CAS_Module(nn.Module):
         self.len_feature = len_feature
         self.self_train = self_train
         self.conv = nn.Sequential(
-            nn.Conv1d(in_channels=2*self.len_feature, out_channels=2048, kernel_size=3,
+            nn.Conv1d(in_channels=self.len_feature, out_channels=2048, kernel_size=3,
                       stride=1, padding=1),
             nn.ReLU()
         )
