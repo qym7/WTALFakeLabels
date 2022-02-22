@@ -187,7 +187,8 @@ class CAS_Module(nn.Module):
 
         self.drop_out = nn.Dropout(p=0.7)
 
-        if self.self_train:
+        # if self.self_train:
+        if False:
             self.sup_classifier = nn.Sequential(
                 nn.Conv1d(in_channels=2048, out_channels=num_classes, kernel_size=1,
                         stride=1, padding=0, bias=False)
@@ -217,13 +218,13 @@ class CAS_Module(nn.Module):
 
         # out: (B, T, C)
         sup_out = None
-        if self.self_train:
-            sup_out = self.sup_drop_out(features.permute(0, 2, 1))
-            sup_out = self.sup_classifier(sup_out)
-            sup_out = sup_out.permute(0, 2, 1)
-            # sup_out = self.mlp(sup_out)
-            # sup_out = self.mlp(out)
-            return out, features, sup_out
+        # if self.self_train:
+        #     sup_out = self.sup_drop_out(features.permute(0, 2, 1))
+        #     sup_out = self.sup_classifier(sup_out)
+        #     sup_out = sup_out.permute(0, 2, 1)
+        #     # sup_out = self.mlp(sup_out)
+        #     # sup_out = self.mlp(out)
+        #     return out, features, sup_out
         return out, features, sup_out
 
 

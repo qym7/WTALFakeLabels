@@ -32,7 +32,7 @@ if __name__ == "__main__":
                 config.r_act, config.r_bkg,
                 config.supervision!='weak')
     net = net.cuda()
-    gcnn = GCN()
+    gcnn = GCN(config.len_feature)
     gcnn = gcnn.cuda()
 
     test_loader = data.DataLoader(
