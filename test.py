@@ -46,6 +46,8 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
 
             # GCN inner video merge version
             data, label, pseudo_label, vid_name, vid_num_seg = next(load_iter)
+            
+            data = net.forward_conv(data.to(torch.float32).cuda())
             data =data.reshape(1, 1, data.shape[-2], data.shape[-1]).cuda()
             pseudo_label = pseudo_label.reshape(1, 1, pseudo_label.shape[-2], pseudo_label.shape[-1]).cuda()
             label = label.reshape(-1, label.shape[-1]).cuda()

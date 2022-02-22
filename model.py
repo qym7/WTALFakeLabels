@@ -72,11 +72,6 @@ class GCN(nn.Module):
         super(GCN, self).__init__()
         self.len_feature = len_feature
         self.gcn_module = GCN_Module()
-        self.conv = nn.Sequential(
-            nn.Conv1d(in_channels=self.len_feature, out_channels=2048, kernel_size=3,
-                      stride=1, padding=1),
-            nn.ReLU()
-        )
 
     def group_node(self, x, gt, thres1=0.2, thres2=0.4):
         '''
@@ -117,10 +112,7 @@ class GCN(nn.Module):
         return torch.stack(nodes), torch.stack(nodes_label), nodes_pos, vid_label
 
     def forward(self, x, gt, index, eval=False):
-        N, n, T, dim = x.shape
-        features = x.reshape(-1, T, dim).permute(0, 2, 1)
-        features = self.conv(features)
-        features = features.permute(0, 2, 1).reshape(N, n, T, dim)
+        features = x
         # features = x
         nodes = []
         nodes_label = []
@@ -136,21 +128,23 @@ class GCN(nn.Module):
             nodes_label_ = nodes_label_
             nodes_ = nodes_
             # add edge weight
-            # # VERSION: weighted1
-            # cur_sim = torch.exp(-sim_matrix(nodes_, nodes_)/0.02)
-            # cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
+            # VERSION: weighted1
+            cur_sim = torch.exp(-sim_matrix(nodes_, nodes_)/0.02)
+            cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
             # # VERSION: weighted2
             # cur_sim = torch.exp(-sim_matrix(nodes_, nodes_)/0.1)
             # cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
             # # VERSION: weighted3
             # cur_sim = torch.exp(sim_matrix(nodes_, nodes_)/0.3)
             # cur_sim = 4 * cur_sim / cur_sim.sum(dim=1)
-            # VERSION: filter1
-            cur_sim = sim_matrix(nodes_, nodes_)
-            mask = cur_sim < 0.7
-            cur_sim = torch.exp(-cur_sim/0.1)
-            cur_sim[mask] = 0
-            cur_sim = 4 * cur_sim / (cur_sim.sum(dim=1)+1e-6)
+            # # VERSION: filter1
+            # cur_sim = sim_matrix(nodes_, nodes_)
+            # mask = cur_sim < 0.7
+            # if not eval:
+            #     print('Filter during forward: ', mask.sum(), nodes_.shape[0]**2)
+            # cur_sim = torch.exp(-cur_sim/0.1)
+            # cur_sim[mask] = 0
+            # cur_sim = 4 * cur_sim / (cur_sim.sum(dim=1)+1e-6)
 
             adj = cur_sim.detach().cpu().numpy() * adj_cls + adj_unc
             # pass to GCN
@@ -172,12 +166,16 @@ class CAS_Module(nn.Module):
         super(CAS_Module, self).__init__()
         self.len_feature = len_feature
         self.self_train = self_train
+        self.gcnn_conv = nn.Sequential(
+            nn.Conv1d(in_channels=self.len_feature, out_channels=2048, kernel_size=3,
+                      stride=1, padding=1),
+            nn.ReLU()
+        )
         self.conv = nn.Sequential(
             nn.Conv1d(in_channels=2*self.len_feature, out_channels=2048, kernel_size=3,
                       stride=1, padding=1),
             nn.ReLU()
         )
-
         self.classifier = nn.Sequential(
             nn.Conv1d(in_channels=2048, out_channels=num_classes, kernel_size=1,
                       stride=1, padding=0, bias=False)
@@ -244,6 +242,13 @@ class Model(nn.Module):
 
         self.drop_out = nn.Dropout(p=0.7)
 
+    def forward_conv(self, x):
+        out = x.permute(0, 2, 1)
+        # out: (B, F, T)
+        out = self.cas_module.gcnn_conv(out)
+        features = out.permute(0, 2, 1)
+        return features
+
     def forward(self, x):
         x = x.reshape(-1, x.shape[-2], x.shape[-1])
         num_segments = x.shape[1]
@@ -289,3 +294,27 @@ class Model(nn.Module):
         cas_softmax = self.softmax_2(cas)
 
         return score_act, score_bkg, feat_act, feat_bkg, features, cas_softmax, sup_cas_softmax
+
+
+class ResidualAttentionBlock(nn.Module):
+    def __init__(self, d_model: int, n_head: int, dropout: float, attn_mask: torch.Tensor = None):
+        super(ResidualAttentionBlock, self).__init__()
+        self.attn = nn.MultiheadAttention(d_model, n_head, dropout=dropout)
+        self.ln_1 = LayerNorm(d_model)
+
+        self.mlp = nn.Sequential(OrderedDict([
+            ("c_fc", nn.Linear(d_model, d_model * 4)),
+            ("gelu", QuickGELU()),
+            ("c_proj", nn.Linear(d_model * 4, d_model))
+        ]))
+        self.ln_2 = LayerNorm(d_model)
+        self.attn_mask = attn_mask
+
+    def attention(self, x: torch.Tensor):
+        self.attn_mask = self.attn_mask.to(dtype=x.dtype, device=x.device) if self.attn_mask is not None else None
+        return self.attn(x, x, x, need_weights=False, attn_mask=self.attn_mask)[0]
+
+    def forward(self, x: torch.Tensor):
+        x = x + self.attention(self.ln_1(x))
+        x = x + self.mlp(self.ln_2(x))
+        return x

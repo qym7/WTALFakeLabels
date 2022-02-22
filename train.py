@@ -14,35 +14,61 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
     net.train()
 
     data, label, gt, vid_names, _, index = next(loader_iter)
-    data = data.cuda()  # reshaped in net
     gt = gt.cuda()  # reshaped in net
     label = label.cuda()
     index = index.cuda()
+    data = data.reshape(-1, data.shape[-2], data.shape[-1]).cuda()
 
-    # Get GCNN feature
-    gcn_data, nodes, nodes_label = gcnn(data, gt, index, eval=False)
+    # Get features after the convolution layer
+    data = net.forward_conv(data)
+
+    # Calculate GCNN features
+    data = data.reshape(gt.shape[0],
+                        gt.shape[1],
+                        data.shape[-2],
+                        data.shape[-1])
+    gcn_data, nodes, nodes_label = gcnn(data.detach(), gt, index, eval=False)
     # Update nodes_bank
     # Do not use grad to accelerate algorithm
     with torch.no_grad():
         _, t_nodes, t_nodes_label = gcnn_teacher(data, gt, index, eval=False)
+        if step < 20:
+            t_nodes = torch.cat(t_nodes)
+            for i in range(len(t_nodes_label)):
+                labels = t_nodes_label[i]
+                labels[labels==1] = 21
+                labels[labels==0] = 20
+                labels[labels==2] = index[i].item()
+                t_nodes_label[i] = labels
+            t_nodes_label = torch.cat(t_nodes_label)
+        else:
+            # filter a cleaner node bank when node bank is not empty
+            _, t_nodes, t_nodes_label = criterion_gcnn(t_nodes, t_nodes_label, index, nodes_bank)
+
+    k = 25
     for i in range(len(index)):
         not_torch_idx = index[i].detach().cpu().item()
         nodes_number = NODES_NUMBER[not_torch_idx]
-        t_act_nodes = t_nodes[i][t_nodes_label[i]==2]
-        t_bkg_nodes = t_nodes[i][t_nodes_label[i]==0]
-
+        # # filter4
+        t_act_nodes = t_nodes[t_nodes_label==not_torch_idx]
+        # random_act_idx = torch.randperm(len(t_act_nodes))[:k]
+        # t_act_nodes = t_act_nodes[random_act_idx]
         # update action nodes
         if len(nodes_bank[not_torch_idx]) == 0:
             nodes_bank[not_torch_idx] = t_act_nodes
         else:
             nodes_bank[not_torch_idx] = torch.cat((t_act_nodes, nodes_bank[not_torch_idx]))
         nodes_bank[not_torch_idx] = nodes_bank[not_torch_idx][:nodes_number]
-        # update bkg nodes
-        if len(nodes_bank[20]) == 0:
-            nodes_bank[20] = t_bkg_nodes
-        else:
-            nodes_bank[20] = torch.cat((t_bkg_nodes, nodes_bank[20]))
-        nodes_bank[20] = nodes_bank[20][:NODES_NUMBER[20]]
+    # update bkg nodes
+    t_bkg_nodes = t_nodes[t_nodes_label==20]
+    # random_bkg_idx = torch.randperm(len(t_bkg_nodes))[:k]
+    # t_bkg_nodes = t_bkg_nodes[random_bkg_idx]
+    if len(nodes_bank[20]) == 0:
+        nodes_bank[20] = t_bkg_nodes
+    else:
+        nodes_bank[20] = torch.cat((t_bkg_nodes, nodes_bank[20]))
+    nodes_bank[20] = nodes_bank[20][:NODES_NUMBER[20]]
+
     # Calculate Contrastive Loss and Back-propagate GCNN
     cost_gcnn = criterion_gcnn(nodes, nodes_label, index, nodes_bank)
     optimizer_gcnn.zero_grad()
