@@ -51,8 +51,8 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
         nodes_number = NODES_NUMBER[not_torch_idx]
         # # filter4
         t_act_nodes = t_nodes[t_nodes_label==not_torch_idx]
-        # random_act_idx = torch.randperm(len(t_act_nodes))[:k]
-        # t_act_nodes = t_act_nodes[random_act_idx]
+        random_act_idx = torch.randperm(len(t_act_nodes))[:k]
+        t_act_nodes = t_act_nodes[random_act_idx]
         # update action nodes
         if len(nodes_bank[not_torch_idx]) == 0:
             nodes_bank[not_torch_idx] = t_act_nodes
@@ -61,16 +61,18 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
         nodes_bank[not_torch_idx] = nodes_bank[not_torch_idx][:nodes_number]
     # update bkg nodes
     t_bkg_nodes = t_nodes[t_nodes_label==20]
-    # random_bkg_idx = torch.randperm(len(t_bkg_nodes))[:k]
-    # t_bkg_nodes = t_bkg_nodes[random_bkg_idx]
+    random_bkg_idx = torch.randperm(len(t_bkg_nodes))[:k]
+    t_bkg_nodes = t_bkg_nodes[random_bkg_idx]
     if len(nodes_bank[20]) == 0:
         nodes_bank[20] = t_bkg_nodes
     else:
         nodes_bank[20] = torch.cat((t_bkg_nodes, nodes_bank[20]))
-    nodes_bank[20] = nodes_bank[20][:NODES_NUMBER[20]]
+    print(len(nodes_bank[20]))
+    if len(nodes_bank[20]) > 0:
+        nodes_bank[20] = nodes_bank[20][:NODES_NUMBER[20]]
 
     # Calculate Contrastive Loss and Back-propagate GCNN
-    cost_gcnn = criterion_gcnn(nodes, nodes_label, index, nodes_bank)
+    cost_gcnn, _, _ = criterion_gcnn(nodes, nodes_label, index, nodes_bank)
     optimizer_gcnn.zero_grad()
     cost_gcnn.backward()
     optimizer_gcnn.step()
