@@ -97,24 +97,24 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
             # Plot and create feature dict
             # For WTAL head
             gt_vid = gt[vid_name[0]]
-            cas = utils.get_cas(gt_vid, cas)
-            wtal_pred_dict[vid_name[0]] = cas
+            cas_ = utils.get_cas(gt_vid, cas)
+            wtal_pred_dict[vid_name[0]] = cas_
             if save:
-                plot_pred(cas, gt_vid, vid_name[0]+'_wtal_inner_', savefig_path)
+                plot_pred(cas_, gt_vid, vid_name[0]+'_wtal_inner_', savefig_path)
             # For Supervision head
             if sup_cas_softmax is not None:
-                cas = sup_cas_softmax
-                cas = utils.get_cas(gt_vid, cas)
-                sup_pred_dict[vid_name[0]] = cas
+                cas_ = sup_cas_softmax
+                cas_ = utils.get_cas(gt_vid, cas_)
+                sup_pred_dict[vid_name[0]] = cas_
                 if save:
-                    plot_pred(cas, gt_vid, vid_name[0]+'_inner_seg_', savefig_path)
+                    plot_pred(cas_, gt_vid, vid_name[0]+'_inner_seg_', savefig_path)
 
             if mAP:
                 pred = np.where(score_np >= config.class_thresh)[0]
 
                 if len(pred) == 0:
                     pred = np.array([np.argmax(score_np)])
-                cas_pred = cas[0].cpu().numpy()[:, pred]
+                cas_pred = cas.cpu().numpy()[0][:, pred]
                 cas_pred = np.reshape(cas_pred, (num_segments, -1, 1))
                 cas_pred = utils.upgrade_resolution(cas_pred, config.scale)
 
@@ -176,6 +176,7 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
                 final_res['results'][vid_name[0]] = utils.result2json(final_proposals)
 
         if save:
+            print(vid_name)
             plot_node(nodes_lst, nodes_label_lst, class_lst, os.path.abspath(config.output_path))
 
         if mAP:
