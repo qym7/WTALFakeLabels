@@ -30,9 +30,9 @@ if __name__ == "__main__":
 
     net = Model(config.len_feature, config.num_classes, 
                 config.r_act, config.r_bkg,
-                config.supervision!='weak')
+                False)
     net = net.cuda()
-    gcnn = GCN()
+    gcnn = GCN(config.len_feature)
     gcnn = gcnn.cuda()
 
     test_loader = data.DataLoader(
@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     test(net, gcnn, config, logger, test_loader, test_info, 0, gt,
          cls_thres=cls_thres, model_file=config.model_file,
-         save=config.save, mAP=True)
+         save=config.save, map=False)
 
     utils.save_best_record_thumos(test_info, 
         os.path.join(config.output_path, "test_record_{}_{}.txt".format(config.test_head, 
