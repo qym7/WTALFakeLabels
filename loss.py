@@ -30,7 +30,7 @@ class GCNN_loss(nn.Module):
             availabel_nodes_label = torch.cat([torch.ones(nodes_bank[i].shape[0]).cuda()*i
                                                for i in range(21) if len(nodes_bank[i])>0]).cuda()
 
-         # delete uncertain nodes
+        # delete uncertain nodes
         nodes = torch.cat(nodes)[node_mask]
         nodes_label = nodes_label[node_mask]
         # calculate similarity

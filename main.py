@@ -122,7 +122,7 @@ if __name__ == "__main__":
               gcnn_teacher, config.m, nodes_bank)
 
         sup_pred_dict = test(net, gcnn, config, logger, test_loader, test_info, step, gt,
-                        cls_thres=cls_thres, save=False, mAP=False)
+                        cls_thres=cls_thres, save=False, map=False)
 
         iou = [test_info['mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1])][-1] for thres in cls_thres]
 

@@ -14,7 +14,7 @@ from eval_utils import plot_pred, plot_node
 
 def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
          cls_thres=np.arange(0.1, 1, 0.1),
-         model_file=None, save=False, mAP=False):
+         model_file=None, save=False, map=False):
     with torch.no_grad():
         net.eval()
 
@@ -31,7 +31,7 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
         if not os.path.exists(savefig_path):
             os.mkdir(savefig_path)
 
-        if mAP:
+        if map:
             final_res = {}
             final_res['version'] = 'VERSION 1.3'
             final_res['results'] = {}
@@ -109,7 +109,7 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
                 if save:
                     plot_pred(cas_, gt_vid, vid_name[0]+'_inner_seg_', savefig_path)
 
-            if mAP:
+            if map:
                 pred = np.where(score_np >= config.class_thresh)[0]
 
                 if len(pred) == 0:
@@ -179,7 +179,7 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
             print(vid_name)
             plot_node(nodes_lst, nodes_label_lst, class_lst, os.path.abspath(config.output_path))
 
-        if mAP:
+        if map:
             json_path = os.path.join(config.output_path, 'inner_result.json')
             with open(json_path, 'w') as f:
                 json.dump(final_res, f)
@@ -205,7 +205,7 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
             test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, wtal_pred_dict, cls_thres)
 
         # Update logger
-        if mAP:
+        if map:
             logger.log_value('Test accuracy', test_acc, step)
             logger.log_value('Average mAP', average_mAP, step)
             for i in range(tIoU_thresh.shape[0]):
@@ -226,7 +226,7 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
 
         # Update test info
         test_info['step'].append(step)
-        if mAP:
+        if map:
             test_info['test_acc'].append(test_acc)
             test_info['average_mAP'].append(average_mAP)
             for i in range(tIoU_thresh.shape[0]):
@@ -251,6 +251,7 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
             if sup_cas_softmax is not None:
                 file_to_write = open(os.path.join(config.output_path,
                                               '{}_sup_inner_pred_25.pickle'.format(config.test_dataset)), 'wb')
-                pickle.dump(sup_pred_dict, file_to_write)
+                pickle.dump(sup_pred_dict, file_to_write,
+                mAP=map)
         
     return sup_pred_dict

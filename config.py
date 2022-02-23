@@ -89,5 +89,5 @@ class_dict = {0: 'BaseballPitch',
                 18: 'ThrowDiscus',
                 19: 'VolleyballSpiking'}
 
-NODES_NUMBER = {i: 100 for i in range(20)}
-NODES_NUMBER[20] = 300
+NODES_NUMBER = {i: 300 for i in range(20)}
+NODES_NUMBER[20] = 1000
