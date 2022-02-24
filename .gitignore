@@ -1,5 +1,6 @@
 models/
 outputs/
+test-outputs/
 logs/
 nlogs/
 glogs/

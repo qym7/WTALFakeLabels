@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import scipy.sparse as sp
 
 from utils import *
+from eval_utils import *
 
 
 class GraphConvolution(nn.Module):
@@ -28,14 +29,14 @@ class GraphConvolution(nn.Module):
             nn.init.zeros_(self.bias)
 
     def forward(self, input_features, adj):
-        support = torch.mm(input_features, self.weight)  # 同weight相乘
-        # support = input_features
+        # support = torch.mm(input_features, self.weight)  # 同weight相乘
+        support = input_features
         output = torch.spmm(adj, support)  # 同adj mat相乘
-        # return output
-        if self.use_bias:
-            return output + self.bias
-        else:
-            return output
+        return output
+        # if self.use_bias:
+        #     return output + self.bias
+        # else:
+        #     return output
 
 
 class GCN_Module(nn.Module):
@@ -57,7 +58,8 @@ class GCN_Module(nn.Module):
 
     def forward(self, X, adj):
         adj = self.get_adj(adj).cuda()
-        X = F.relu(self.gcn1(X, adj))
+        # X = F.relu(self.gcn1(X, adj))
+        X = self.gcn1(X, adj)
         X = self.gcn2(X, adj)
         # X = self.gcn1(X, adj)
 
@@ -117,11 +119,11 @@ class GCN(nn.Module):
         return torch.stack(nodes), torch.stack(nodes_label), nodes_pos, vid_label
 
     def forward(self, x, gt, index, eval=False):
-        N, n, T, dim = x.shape
-        features = x.reshape(-1, T, dim).permute(0, 2, 1)
-        features = self.conv(features)
-        features = features.permute(0, 2, 1).reshape(N, n, T, dim)
-        # features = x
+        # N, n, T, dim = x.shape
+        # features = x.reshape(-1, T, dim).permute(0, 2, 1)
+        # features = self.conv(features)
+        # features = features.permute(0, 2, 1).reshape(N, n, T, dim)
+        features = x
         nodes = []
         nodes_label = []
         updated_x = torch.zeros_like(features).cuda()
@@ -132,11 +134,27 @@ class GCN(nn.Module):
             gt_cls = gt[i, :, :, index[i]]  # N * T
             # 由于只有在同类视频里产生节点图，所以需要迭代循环所有类
             nodes_, nodes_label_, nodes_pos_, vid_label_ = self.group_node(vids, gt_cls)
-            adj = generate_adj_matrix(nodes_label_.detach().cpu().numpy())
+            gt_nodes_, _, _, _ = self.group_node(gt_cls, gt_cls)
+            adj_cls, adj_unc = generate_adj_matrix(nodes_label_.detach().cpu().numpy())
+
+            # VERSION: normal
+            mask_cls = (torch.Tensor(adj_cls).cuda()) == 0
+            mask_unc = (torch.Tensor(adj_unc).cuda()) == 0
+            cur_sim = sim_matrix(nodes_, nodes_)
+            # add filter
+            cur_sim[cur_sim<0.7] = 0
+            cur_sim_cls = torch.exp(-cur_sim/0.1)
+            cur_sim_cls[mask_cls] = 0
+            cur_sim_cls = 2 * cur_sim_cls / (cur_sim_cls.sum(dim=1)+1e-6)
+            cur_sim_unc = cur_sim
+            cur_sim_unc[mask_unc] = 0
+            adj = cur_sim_cls.detach().cpu().numpy()*adj_cls + cur_sim_unc.detach().cpu().numpy()*adj_unc
+
             nodes_label_ = nodes_label_
             nodes_ = nodes_
             # pass to GCN
             x_ = self.gcn_module(nodes_, adj)
+            gt_nodes_ = self.gcn_module(gt_nodes_.unsqueeze(1).to(torch.float32), adj)
             # 加入N个同类视频的节点
             nodes.append(x_)
             # 产生上述节点对应标签，2为action，0为bkg，1为不确定
@@ -145,6 +163,7 @@ class GCN(nn.Module):
             with torch.no_grad():
                 for j, pos in enumerate(nodes_pos_):
                     updated_x[i, pos[0], pos[1]:pos[2]] = x_[j].repeat(pos[2]-pos[1], 1).clone()
+                    gt[i, pos[0], pos[1]:pos[2], index[i]] = gt_nodes_[j] * torch.ones(pos[2]-pos[1]).cuda()
 
         return updated_x, nodes, nodes_label
 
@@ -164,7 +183,8 @@ class SELayer(nn.Module):
         b, c, _ = x.size()
         y = self.avg_pool(x).view(b, c)
         y = self.fc(y).view(b, c, 1)
-        # print('se weight', y[:, :int(c/2), :].mean(), y[:, int(c/2):, :].mean())
+        if b > 1:
+            print('se weight', y[:, :int(c/2), :].mean(), y[:, int(c/2):, :].mean())
         return x * y.expand_as(x)
 
 
@@ -173,7 +193,7 @@ class CAS_Module(nn.Module):
         super(CAS_Module, self).__init__()
         self.len_feature = len_feature
         self.self_train = self_train
-        # self.se_layer = SELayer(channel=4096, reduction=16)
+        # self.se_layer = SELayer(channel=len_feature*2, reduction=16)
         self.conv = nn.Sequential(
             nn.Conv1d(in_channels=self.len_feature, out_channels=2048, kernel_size=3,
                       stride=1, padding=1),
@@ -209,7 +229,7 @@ class CAS_Module(nn.Module):
         # x: (B, T, F)
         # conv version to deremark
         out = x.permute(0, 2, 1)
-        out = self.se_layer(out)
+        # out = self.se_layer(out)
         # out: (B, F, T)
         out = self.conv(out)
         features = out.permute(0, 2, 1)

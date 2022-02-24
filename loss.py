@@ -38,10 +38,10 @@ class GCNN_loss(nn.Module):
         # mask all pairs of same classes
         mask = nodes_label.unsqueeze(1) - availabel_nodes_label.unsqueeze(0)
         mask = mask == 0
-        mask_act = mask.clone()
-        mask_bkg = mask.clone()
-        mask_act[:, availabel_nodes_label==20] = 0
-        mask_bkg[:, availabel_nodes_label<20] = 0
+        # mask_act = mask.clone()
+        # mask_bkg = mask.clone()
+        # mask_act[:, availabel_nodes_label==20] = 0
+        # mask_bkg[:, availabel_nodes_label<20] = 0
         one_similarity_matrix = similarity_matrix.clone()
         # eliminate nodes of different type
         one_similarity_matrix[~mask] = 1
@@ -50,11 +50,12 @@ class GCNN_loss(nn.Module):
         pair_index = one_similarity_matrix.argmin(dim=1).detach()
         pair_similarity = one_similarity_matrix[torch.arange(nodes.shape[0]), pair_index]
 
-        return nodes, pair_similarity, nodes_label, mask_act, mask_bkg, similarity_matrix
+        # return nodes, pair_similarity, nodes_label, mask_act, mask_bkg, similarity_matrix
+        return nodes, pair_similarity, nodes_label, mask, similarity_matrix
 
     def forward(self, nodes, nodes_label, index, nodes_bank):
-        nodes, pair_similarity, nodes_label, mask_act, mask_bkg, similarity_matrix = self.construct_pairs(nodes, nodes_label, index, nodes_bank)
-        loss = self.loss(nodes, pair_similarity, nodes_label, mask_act, mask_bkg, similarity_matrix)
+        nodes, pair_similarity, nodes_label, mask, similarity_matrix = self.construct_pairs(nodes, nodes_label, index, nodes_bank)
+        loss = self.loss(nodes, pair_similarity, nodes_label, mask, similarity_matrix)
         return loss * self.gcnn_weight
 
 
@@ -64,21 +65,21 @@ class ContrastiveLoss(nn.Module):
         self.register_buffer("temperature", torch.tensor(temperature))
 
     def forward(self, nodes, pair_similarity, nodes_labels,
-                mask_act, mask_bkg, similarity_matrix):
+                mask, similarity_matrix):
         # Calculate positive-pair similairy
         nominator = torch.exp(pair_similarity / self.temperature)
+        # Calculate negetive-pair similairy
+        denominator = ((~mask).int()+1e-8) * torch.exp(similarity_matrix / self.temperature)
+        loss_partial = -torch.log(nominator / torch.sum(denominator, dim=1))
+        loss = torch.sum(loss_partial) / nodes.shape[0]
         # # Calculate negetive-pair similairy
-        # denominator = ((~mask).int()+1e-8) * torch.exp(similarity_matrix / self.temperature)
+        # denominator = ((~mask_act).int()+1e-8) * torch.exp(similarity_matrix / self.temperature)
         # loss_partial = -torch.log(nominator / torch.sum(denominator, dim=1))
-        # loss = torch.sum(loss_partial) / nodes.shape[0]
-        # Calculate negetive-pair similairy
-        denominator = ((~mask_act).int()+1e-8) * torch.exp(similarity_matrix / self.temperature)
-        loss_partial = -torch.log(nominator / torch.sum(denominator, dim=1))
-        loss_act = torch.sum(loss_partial) / nodes.shape[0]
-        # Calculate negetive-pair similairy
-        denominator = ((~mask_bkg).int()+1e-8) * torch.exp(similarity_matrix / self.temperature)
-        loss_partial = -torch.log(nominator / torch.sum(denominator, dim=1))
-        loss_bkg = torch.sum(loss_partial) / nodes.shape[0]
+        # loss_act = torch.sum(loss_partial) / nodes.shape[0]
+        # # Calculate negetive-pair similairy
+        # denominator = ((~mask_bkg).int()+1e-8) * torch.exp(similarity_matrix / self.temperature)
+        # loss_partial = -torch.log(nominator / torch.sum(denominator, dim=1))
+        # loss_bkg = torch.sum(loss_partial) / nodes.shape[0]
 
         loss = loss_act + loss_bkg
         return loss

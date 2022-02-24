@@ -272,21 +272,24 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     return torch.sparse.FloatTensor(indices, values, shape)
 
 def generate_adj_matrix(nodes_label):
-    diff_edges = np.where(np.abs(np.diff(nodes_label)) == 1)[0]  # bkg和uncertain, act和uncertain之间的边
-    diff_edges = list(product(diff_edges, diff_edges+1))
+    # diff_edges = np.where(np.abs(np.diff(nodes_label)) == 1)[0]  # bkg和uncertain, act和uncertain之间的边
+    l = len(nodes_label)
+    diff_edges = [(i, i+1) for i in range(l-1)]
     act_edges = np.where(nodes_label == 2)[0]  # act之间的边
     act_edges = list(product(act_edges, act_edges))
     bkg_edges = np.where(nodes_label == 0)[0]  # bkg之间的边
     bkg_edges = list(product(bkg_edges, bkg_edges))
-    adj = np.zeros((len(nodes_label), len(nodes_label)))
+    adj_cls = np.zeros((len(nodes_label), len(nodes_label)))
+    adj_unc = np.zeros((len(nodes_label), len(nodes_label)))
     if len(diff_edges) > 0:
-        np.add.at(adj, tuple(zip(*diff_edges)), 1)
-    np.add.at(adj, tuple(zip(*act_edges)), 1)
-    np.add.at(adj, tuple(zip(*bkg_edges)), 1)
-    np.fill_diagonal(adj, 0)  # 消除act和bkg product中产生的自己指向自己的边，这个自指边在adjacent matrix后续normalize过程中会加上
-    adj = np.logical_or(adj, (adj.T)).astype(float)
+        np.add.at(adj_unc, tuple(zip(*diff_edges)), 1)
+    np.add.at(adj_cls, tuple(zip(*act_edges)), 1)
+    np.add.at(adj_cls, tuple(zip(*bkg_edges)), 1)
+    np.fill_diagonal(adj_cls, 0)  # 消除act和bkg product中产生的自己指向自己的边，这个自指边在adjacent matrix后续normalize过程中会加上
+    adj_cls = np.logical_or(adj_cls, (adj_cls.T)).astype(float)
+    adj_unc = np.logical_or(adj_unc, (adj_unc.T)).astype(float)
 
-    return adj
+    return adj_cls, adj_unc
 
 def group_node(x, gt, thres1=0.2, thres2=0.4):
     '''

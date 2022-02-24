@@ -3,6 +3,7 @@ import torch.nn as nn
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from scipy.signal import savgol_filter
 
 import utils
 import os
@@ -23,6 +24,7 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
 
         wtal_pred_dict = {}
         sup_pred_dict = {}
+
         nodes_lst = []
         nodes_label_lst = []
         class_lst = []
@@ -60,9 +62,9 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
                 class_lst.append(np.ones(len(cur_nodes[0]))*(index.detach().cpu().item()))
             gcn_data = gcn_data/len(torch.where(label[0]==1)[0])
 
-            data = torch.cat([data, gcn_data], dim=-1)
+            # data = torch.cat([data, gcn_data], dim=-1)
             # data = (data + gcn_data)/2
-            data = data.reshape(-1, data.shape[-2], data.shape[-1]).detach()
+            data = gcn_data.reshape(-1, data.shape[-2], data.shape[-1]).detach()
             pseudo_label = pseudo_label.detach()
 
             # # normal version
@@ -109,6 +111,7 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
                 sup_pred_dict[vid_name[0]] = cas_
                 if save:
                     plot_pred(cas_, gt_vid, vid_name[0]+'_inner_seg_', savefig_path)
+            plot_pred(pseudo_label[0][0].detach().cpu(), gt_vid, 'Yes-' + vid_name[0]+'_inner_seg_', savefig_path)
 
             if map:
                 pred = np.where(score_np >= config.class_thresh)[0]
@@ -178,7 +181,7 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
 
         if save:
             print(vid_name)
-            plot_node(nodes_lst, nodes_label_lst, class_lst, os.path.abspath(config.output_path))
+            # plot_node(nodes_lst, nodes_label_lst, class_lst, os.path.abspath(config.output_path))
 
         if map:
             json_path = os.path.join(config.output_path, 'inner_result.json')
@@ -224,7 +227,6 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
         for i in range(len(cls_thres)):
             logger.log_value('act_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
 
-
         # Update test info
         test_info['step'].append(step)
         if map:
@@ -254,5 +256,5 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
                                               '{}_sup_inner_pred_25.pickle'.format(config.test_dataset)), 'wb')
                 pickle.dump(sup_pred_dict, file_to_write,
                 mAP=map)
-        
+
     return sup_pred_dict

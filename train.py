@@ -20,12 +20,13 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
     index = index.cuda()
 
     # Get GCNN feature
-    gcn_data, nodes, nodes_label = gcnn(data, gt, index, eval=False)
+    gcn_data, nodes, nodes_label = gcnn(data, gt, index, vid_names, eval=False)
     # Update nodes_bank
     # Do not use grad to accelerate algorithm
     # Get GCNN feature
     with torch.no_grad():
         _, t_nodes, t_nodes_label = gcnn_teacher(data, gt, index, eval=False)
+
     for i in range(len(index)):
         not_torch_idx = index[i].detach().cpu().item()
         nodes_number = NODES_NUMBER[not_torch_idx]
@@ -55,9 +56,9 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
 
     # Isolate gradient between GCNN and WTAL model
     label = label.reshape(-1, label.shape[-1]).to(torch.float32).detach()
-    data = torch.cat([data, gcn_data], dim=-1)
+    # data = torch.cat([data, gcn_data], dim=-1)
     # data = (data + gcn_data)/2
-    data = data.reshape(-1, data.shape[-2], data.shape[-1]).detach()
+    data = gcn_data.reshape(-1, data.shape[-2], data.shape[-1])
     gt = gt.reshape(-1, gt.shape[-2], gt.shape[-1]).detach()
     score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax = net(data)
 

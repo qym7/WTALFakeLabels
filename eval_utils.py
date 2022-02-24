@@ -3,6 +3,7 @@ import json
 import pickle
 
 from matplotlib import colors
+from scipy.signal import savgol_filter
 
 import torch
 import numpy as np
@@ -183,6 +184,7 @@ def save_pred():
         - fps = 25
     '''
     pass
+
 
 def plot_one_class(cas, gt, class_name, video_name, save_path):
     '''
