@@ -51,6 +51,7 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
             label = label.reshape(-1, label.shape[-1]).cuda()
 
             gcn_data = torch.zeros_like(data)
+
             for index in torch.where(label[0]==1)[0]:
                 cur_data, cur_nodes, cur_nodes_label = gcnn(data, pseudo_label, [index], eval=True)
                 gcn_data += cur_data

@@ -149,13 +149,33 @@ class GCN(nn.Module):
         return updated_x, nodes, nodes_label
 
 
+class SELayer(nn.Module):
+    def __init__(self, channel, reduction=16):
+        super(SELayer, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool1d(1)
+        self.fc = nn.Sequential(
+            nn.Linear(channel, channel // reduction, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Linear(channel // reduction, channel, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x, eval=False):
+        b, c, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1)
+        # print('se weight', y[:, :int(c/2), :].mean(), y[:, int(c/2):, :].mean())
+        return x * y.expand_as(x)
+
+
 class CAS_Module(nn.Module):
     def __init__(self, len_feature, num_classes, self_train):
         super(CAS_Module, self).__init__()
         self.len_feature = len_feature
         self.self_train = self_train
+        # self.se_layer = SELayer(channel=4096, reduction=16)
         self.conv = nn.Sequential(
-            nn.Conv1d(in_channels=2*self.len_feature, out_channels=2048, kernel_size=3,
+            nn.Conv1d(in_channels=self.len_feature, out_channels=2048, kernel_size=3,
                       stride=1, padding=1),
             nn.ReLU()
         )
@@ -189,6 +209,7 @@ class CAS_Module(nn.Module):
         # x: (B, T, F)
         # conv version to deremark
         out = x.permute(0, 2, 1)
+        out = self.se_layer(out)
         # out: (B, F, T)
         out = self.conv(out)
         features = out.permute(0, 2, 1)

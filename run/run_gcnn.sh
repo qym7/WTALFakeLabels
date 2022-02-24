@@ -1,6 +1,6 @@
-model_path='./models/GT-2-layer'
-output_path='./outputs/GT-2-layer'
-log_path='./glogs/GT-2-layer'
+model_path='./models/GT-2-layer-secat-2cts'
+output_path='./outputs/GT-2-layer-secat-2cts'
+log_path='./glogs/GT-2-layer-secat-2cts'
 seed=0
 data_path='/GPFS/public/AR/THUMOS14'
 supervision='self'
@@ -20,4 +20,4 @@ test_head='wtal'
 dynamic='0'
 map='0'
 
-CUDA_VISIBLE_DEVICES=1 python -W ignore ./main.py --model_path ${model_path} --output_path ${output_path} --log_path ${log_path} --seed ${seed} --data_path ${data_path} --supervision ${supervision} --supervision_path ${supervision_path} --thres ${thres} --thres_down ${thres_down} --lmbd ${lmbd} --neg_lmbd ${neg_lmbd} --bkg_lmbd ${bkg_lmbd} --test_dataset ${test_dataset} --test_head ${test_head} --batch_size ${batch_size} --N ${N}  --gcnn_weight ${gcnn_weight} --dynamic ${dynamic} --map ${map}
+CUDA_VISIBLE_DEVICES=7 python -W ignore ./main.py --model_path ${model_path} --output_path ${output_path} --log_path ${log_path} --seed ${seed} --data_path ${data_path} --supervision ${supervision} --supervision_path ${supervision_path} --thres ${thres} --thres_down ${thres_down} --lmbd ${lmbd} --neg_lmbd ${neg_lmbd} --bkg_lmbd ${bkg_lmbd} --test_dataset ${test_dataset} --test_head ${test_head} --batch_size ${batch_size} --N ${N}  --gcnn_weight ${gcnn_weight} --dynamic ${dynamic} --map ${map}
