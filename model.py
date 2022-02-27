@@ -60,7 +60,7 @@ class GCN_Module(nn.Module):
         adj = self.get_adj(adj).cuda()
         # X = F.relu(self.gcn1(X, adj))
         X = self.gcn1(X, adj)
-        X = self.gcn2(X, adj)
+        # X = self.gcn2(X, adj)
         # X = self.gcn1(X, adj)
 
         return X
@@ -132,6 +132,9 @@ class GCN(nn.Module):
         for i in range(len(features)):
             vids = features[i]
             gt_cls = gt[i, :, :, index[i]]  # N * T
+            gt_cls = [torch.Tensor(savgol_filter(gt_cls[i].detach().cpu().numpy(), 15, 3, mode= 'nearest'))
+                      for i in range(gt_cls.shape[0])]
+            gt_cls = torch.stack(gt_cls).cuda()
             # 由于只有在同类视频里产生节点图，所以需要迭代循环所有类
             nodes_, nodes_label_, nodes_pos_, vid_label_ = self.group_node(vids, gt_cls)
             gt_nodes_, _, _, _ = self.group_node(gt_cls, gt_cls)
@@ -193,7 +196,7 @@ class CAS_Module(nn.Module):
         super(CAS_Module, self).__init__()
         self.len_feature = len_feature
         self.self_train = self_train
-        # self.se_layer = SELayer(channel=len_feature*2, reduction=16)
+        self.se_layer = SELayer(channel=len_feature*2, reduction=16)
         self.conv = nn.Sequential(
             nn.Conv1d(in_channels=self.len_feature, out_channels=2048, kernel_size=3,
                       stride=1, padding=1),
@@ -229,7 +232,7 @@ class CAS_Module(nn.Module):
         # x: (B, T, F)
         # conv version to deremark
         out = x.permute(0, 2, 1)
-        # out = self.se_layer(out)
+        out = self.se_layer(out)
         # out: (B, F, T)
         out = self.conv(out)
         features = out.permute(0, 2, 1)
