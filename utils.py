@@ -239,9 +239,9 @@ def calculate_iou(gt, pred_dict, cls_thres):
 
 def encode_onehot(labels):
     classes = set(labels)
-    class_dict = {c: np.identity(len(classes))[i, :] for i, c in enumerate(classes)}
+    config.class_dict = {c: np.identity(len(classes))[i, :] for i, c in enumerate(classes)}
     
-    label_onehot = np.array(list(map(class_dict.get, labels)),
+    label_onehot = np.array(list(map(config.class_dict.get, labels)),
                            dtype=np.int32)
     
     return label_onehot

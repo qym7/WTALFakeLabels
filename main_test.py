@@ -71,3 +71,4 @@ if __name__ == "__main__":
         os.path.join(config.output_path, "test_record_{}_{}.txt".format(config.test_head, 
                                                                         config.test_dataset)),
         cls_thres=cls_thres, mAP=True)
+

@@ -8,8 +8,6 @@ import torch
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
-import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 
 from config import class_dict
@@ -184,7 +182,7 @@ def save_pred():
     '''
     pass
 
-def plot_one_class(cas, gt, class_name, video_name, save_path):
+def plot_one_class(cas, gt, class_name, video_name, save_path, compare=None):
     '''
     Function to plot and save
     Args:
@@ -193,6 +191,8 @@ def plot_one_class(cas, gt, class_name, video_name, save_path):
     '''
     plt.figure()
     plt.plot(range(cas.shape[0]), cas, linewidth=1, color='b', label='pred')
+    if compare is not None:
+        plt.plot(range(compare.shape[0]), compare, linewidth=1, color='y', label='ptal')
     gt = list(gt)
     x = list(range(cas.shape[0]))
     i = 0
@@ -217,18 +217,21 @@ def plot_one_class(cas, gt, class_name, video_name, save_path):
     plt.savefig(os.path.join(save_path, '{}_{}.png'.format(video_name, class_name)))
 
 
-def plot_pred(cas, gt, video_name, save_path):
+def plot_pred(cas, gt, video_name, save_path, compare_cas=None):
     '''
     Function to plot and save
     Args:
         - cas: T * 20
         - gt: T * 20
     '''
+    compare = None
     for i in range(cas.shape[1]):
         if sum(gt[:, i]) > 0:
+            if compare_cas is not None:
+                compare = compare_cas[:, i]
             class_name = class_dict[i]
             plot_one_class(cas[:, i], gt[:, i], class_name,
-                           video_name, save_path)
+                           video_name, save_path, compare)
 
 
 def visualise_PCA(X, y, class_lst, save_path):
@@ -284,4 +287,5 @@ def plot_node(nodes, nodes_label, class_lst, save_path):
 if __name__ == '__main__':
     # save_gt()
     # turn_time2frame('/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/outputs/UM')
-    test_iou('/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/outputs/UM')
+    # test_iou('/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/outputs/UM')
+    compare_path = '/GPFS/data/yimingqin/code/PTAL/outputs/LACP/val_wtal_inner_pred_25.pickle'
