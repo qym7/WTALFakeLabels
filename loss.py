@@ -38,6 +38,8 @@ class GCNN_loss(nn.Module):
         # mask all pairs of same classes
         mask = nodes_label.unsqueeze(1) - availabel_nodes_label.unsqueeze(0)
         mask = mask == 0
+        mask_act = nodes_label == 20
+        mask[mask_act] == 0
         mask_act = mask.clone()
         mask_bkg = mask.clone()
         mask_act[:, availabel_nodes_label==20] = 0

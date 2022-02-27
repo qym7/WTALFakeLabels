@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import scipy.sparse as sp
+from scipy.signal import savgol_filter
 
 from utils import *
 
@@ -57,9 +58,9 @@ class GCN_Module(nn.Module):
 
     def forward(self, X, adj):
         adj = self.get_adj(adj).cuda()
-        X = F.relu(self.gcn1(X, adj))
-        X = self.gcn2(X, adj)
-        # X = self.gcn1(X, adj)
+        # X = F.relu(self.gcn1(X, adj))
+        # X = self.gcn2(X, adj)
+        X = self.gcn1(X, adj)
 
         return X
 
@@ -129,7 +130,9 @@ class GCN(nn.Module):
         # bs * N * T * 20, bs也意味着有bs类的视频，每类视频有N个
         for i in range(len(features)):
             vids = features[i]
-            gt_cls = gt[i, :, :, index[i]]  # N * T
+            gt_cls = savgol_filter(gt[i, :, :, index[i]].detach().cpu().numpy(),
+                                                  15, 3, mode= 'nearest')
+            gt_cls = torch.Tensor(gt_cls).cuda()  # N * T
             # 由于只有在同类视频里产生节点图，所以需要迭代循环所有类
             nodes_, nodes_label_, nodes_pos_, vid_label_ = self.group_node(vids, gt_cls)
             adj = generate_adj_matrix(nodes_label_.detach().cpu().numpy())
@@ -164,7 +167,8 @@ class SELayer(nn.Module):
         b, c, _ = x.size()
         y = self.avg_pool(x).view(b, c)
         y = self.fc(y).view(b, c, 1)
-        # print('se weight', y[:, :int(c/2), :].mean(), y[:, int(c/2):, :].mean())
+        if b>1:
+            print('se weight', y[:, :int(c/2), :].mean(), y[:, int(c/2):, :].mean())
         return x * y.expand_as(x)
 
 
@@ -173,9 +177,9 @@ class CAS_Module(nn.Module):
         super(CAS_Module, self).__init__()
         self.len_feature = len_feature
         self.self_train = self_train
-        # self.se_layer = SELayer(channel=4096, reduction=16)
+        self.se_layer = SELayer(channel=4096, reduction=16)
         self.conv = nn.Sequential(
-            nn.Conv1d(in_channels=self.len_feature, out_channels=2048, kernel_size=3,
+            nn.Conv1d(in_channels=2*self.len_feature, out_channels=2048, kernel_size=3,
                       stride=1, padding=1),
             nn.ReLU()
         )

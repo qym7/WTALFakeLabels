@@ -1,12 +1,12 @@
-model_path='./models/GT-2-layer-secat-2cts'
-output_path='./outputs/GT-2-layer-secat-2cts'
-log_path='./glogs/GT-2-layer-secat-2cts'
+model_path='./models/UM-1-layer-secat-filter-2cts'
+output_path='./outputs/UM-1-layer-secat-filter-2cts'
+log_path='./glogs/UM-1-layer-secat-filter-2cts'
 seed=0
 data_path='/GPFS/public/AR/THUMOS14'
 supervision='self'
 # CHANGE PATH!!!!!
-# supervision_path='/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/outputs/UM-val/val_pred_25.pickle'
-supervision_path='/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/dataset/thumos_annotations/val_gt_25.pickle'
+supervision_path='/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/outputs/UM-val/val_pred_25.pickle'
+# supervision_path='/GPFS/data/yimingqin/code/WTAL-Uncertainty-Modeling/dataset/thumos_annotations/val_gt_25.pickle'
 batch_size='4'
 N='4'
 thres='0.2'
