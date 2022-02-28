@@ -26,6 +26,7 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
     # Get GCNN feature
     with torch.no_grad():
         _, t_nodes, t_nodes_label = gcnn_teacher(data, gt, index, eval=False)
+
     for i in range(len(index)):
         not_torch_idx = index[i].detach().cpu().item()
         nodes_number = NODES_NUMBER[not_torch_idx]
