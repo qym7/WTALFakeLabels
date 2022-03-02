@@ -11,21 +11,22 @@ from config import NODES_NUMBER
 def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
           criterion, criterion_gcnn, logger, step, gcnn_teacher,
           m, nodes_bank):
+
     net.train()
 
-    data, label, gt, vid_names, _, index = next(loader_iter)
+    data, label, pseudo_label, vid_names, _, index = next(loader_iter)
     data = data.cuda()  # reshaped in net
-    gt = gt.cuda()  # reshaped in net
+    pseudo_label = pseudo_label.cuda()  # reshaped in net
     label = label.cuda()
     index = index.cuda()
 
     # Get GCNN feature
-    gcn_data, nodes, nodes_label = gcnn(data, gt, index, vid_names, eval=False)
+    gcn_data, nodes, nodes_label = gcnn(data, pseudo_label, index, vid_names, eval=False)
     # Update nodes_bank
     # Do not use grad to accelerate algorithm
     # Get GCNN feature
     with torch.no_grad():
-        _, t_nodes, t_nodes_label = gcnn_teacher(data, gt, index, eval=False)
+        _, t_nodes, t_nodes_label = gcnn_teacher(data, pseudo_label, index, eval=False)
 
     for i in range(len(index)):
         not_torch_idx = index[i].detach().cpu().item()
@@ -59,12 +60,12 @@ def train(net, gcnn, loader_iter, optimizer, optimizer_gcnn,
     # data = torch.cat([data, gcn_data], dim=-1)
     # data = (data + gcn_data)/2
     data = gcn_data.reshape(-1, data.shape[-2], data.shape[-1])
-    gt = gt.reshape(-1, gt.shape[-2], gt.shape[-1]).detach()
+    pseudo_label = pseudo_label.reshape(-1, pseudo_label.shape[-2], pseudo_label.shape[-1]).detach()
     score_act, score_bkg, feat_act, feat_bkg, _, _, sup_cas_softmax = net(data)
 
     # Calculate WTAL Loss and Back-propagate
     cost, loss = criterion(score_act, score_bkg, feat_act, feat_bkg, label,
-                           gt, sup_cas_softmax, step=step)
+                           pseudo_label, sup_cas_softmax, step=step)
     loss['loss_gcnn'] = cost_gcnn
     print("loss_gcnn", cost_gcnn.detach().cpu().item())
 

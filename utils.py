@@ -272,9 +272,10 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     return torch.sparse.FloatTensor(indices, values, shape)
 
 def generate_adj_matrix(nodes_label):
-    # diff_edges = np.where(np.abs(np.diff(nodes_label)) == 1)[0]  # bkg和uncertain, act和uncertain之间的边
-    l = len(nodes_label)
-    diff_edges = [(i, i+1) for i in range(l-1)]
+    diff_edges = np.where(np.abs(np.diff(nodes_label)) == 1)[0]  # bkg和uncertain, act和uncertain之间的边
+    diff_edges = [(i, i+1) for i in diff_edges]
+    # l = len(nodes_label)
+    # diff_edges = [(i, i+1) for i in range(l-1)]
     act_edges = np.where(nodes_label == 2)[0]  # act之间的边
     act_edges = list(product(act_edges, act_edges))
     bkg_edges = np.where(nodes_label == 0)[0]  # bkg之间的边

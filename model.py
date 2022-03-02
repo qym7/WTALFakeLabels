@@ -59,9 +59,9 @@ class GCN_Module(nn.Module):
     def forward(self, X, adj):
         adj = self.get_adj(adj).cuda()
         # X = F.relu(self.gcn1(X, adj))
-        X = self.gcn1(X, adj)
-        # X = self.gcn2(X, adj)
         # X = self.gcn1(X, adj)
+        # X = self.gcn2(X, adj)
+        X = self.gcn1(X, adj)
 
         return X
 
@@ -80,7 +80,7 @@ class GCN(nn.Module):
             nn.ReLU()
         )
 
-    def group_node(self, x, gt, thres1=0.2, thres2=0.4):
+    def group_node(self, x, gt, thres1=0.2, thres2=0.6):
         '''
         gt: bs * T * 20
         return:
@@ -118,8 +118,8 @@ class GCN(nn.Module):
 
         return torch.stack(nodes), torch.stack(nodes_label), nodes_pos, vid_label
 
-    def forward(self, x, gt, index, eval=False):
-        # N, n, T, dim = x.shape
+    def forward(self, x, pseudo_label, index, eval=False):
+        N, n, T, dim = x.shape
         # features = x.reshape(-1, T, dim).permute(0, 2, 1)
         # features = self.conv(features)
         # features = features.permute(0, 2, 1).reshape(N, n, T, dim)
@@ -131,30 +131,33 @@ class GCN(nn.Module):
         # bs * N * T * 20, bs也意味着有bs类的视频，每类视频有N个
         for i in range(len(features)):
             vids = features[i]
-            gt_cls = gt[i, :, :, index[i]]  # N * T
-            gt_cls = [torch.Tensor(savgol_filter(gt_cls[i].detach().cpu().numpy(), 15, 3, mode= 'nearest'))
-                      for i in range(gt_cls.shape[0])]
-            gt_cls = torch.stack(gt_cls).cuda()
+            gt_cls = pseudo_label[i, :, :, index[i]]  # N * T
+            # gt_cls = [torch.Tensor(savgol_filter(gt_cls[i].detach().cpu().numpy(), 15, 3, mode= 'nearest'))
+                    #   for i in range(gt_cls.shape[0])]
+            # gt_cls = torch.stack(gt_cls).cuda()
             # 由于只有在同类视频里产生节点图，所以需要迭代循环所有类
             nodes_, nodes_label_, nodes_pos_, vid_label_ = self.group_node(vids, gt_cls)
             gt_nodes_, _, _, _ = self.group_node(gt_cls, gt_cls)
             adj_cls, adj_unc = generate_adj_matrix(nodes_label_.detach().cpu().numpy())
 
-            # VERSION: normal
-            mask_cls = (torch.Tensor(adj_cls).cuda()) == 0
-            mask_unc = (torch.Tensor(adj_unc).cuda()) == 0
-            cur_sim = sim_matrix(nodes_, nodes_)
+            # # VERSION: normal
+            # mask_cls = (torch.Tensor(adj_cls).cuda()) == 0
+            # mask_unc = (torch.Tensor(adj_unc).cuda()) == 0
+            # cur_sim = sim_matrix(nodes_, nodes_)
             # add filter
-            cur_sim[cur_sim<0.7] = 0
+            cur_sim = sim_matrix(nodes_, nodes_)
+            mask_sim = cur_sim < 0.9
+            print('filter 1', mask_sim.sum().detach().cpu().item(),
+                    cur_sim.shape[0]*cur_sim.shape[1])
+            mask = (torch.Tensor(adj_cls).cuda()) == 0
             cur_sim_cls = torch.exp(-cur_sim/0.1)
-            cur_sim_cls[mask_cls] = 0
-            cur_sim_cls = 2 * cur_sim_cls / (cur_sim_cls.sum(dim=1)+1e-6)
-            cur_sim_unc = cur_sim
-            cur_sim_unc[mask_unc] = 0
-            adj = cur_sim_cls.detach().cpu().numpy()*adj_cls + cur_sim_unc.detach().cpu().numpy()*adj_unc
-
-            nodes_label_ = nodes_label_
-            nodes_ = nodes_
+            cur_sim_cls[torch.logical_or(mask_sim, mask)] = 0
+            cur_sim_cls = 4 * cur_sim_cls / (cur_sim_cls.sum(dim=1)+1e-6)
+            mask = (torch.Tensor(adj_unc).cuda()) == 0
+            cur_sim_unc = 2 * cur_sim
+            cur_sim_unc[torch.logical_or(mask_sim, mask)] = 0
+            adj = cur_sim_cls.detach().cpu().numpy() * adj_cls  + cur_sim_unc.detach().cpu().numpy() * adj_unc
+            # adj = adj_cls + adj_unc
             # pass to GCN
             x_ = self.gcn_module(nodes_, adj)
             gt_nodes_ = self.gcn_module(gt_nodes_.unsqueeze(1).to(torch.float32), adj)
@@ -166,7 +169,7 @@ class GCN(nn.Module):
             with torch.no_grad():
                 for j, pos in enumerate(nodes_pos_):
                     updated_x[i, pos[0], pos[1]:pos[2]] = x_[j].repeat(pos[2]-pos[1], 1).clone()
-                    gt[i, pos[0], pos[1]:pos[2], index[i]] = gt_nodes_[j] * torch.ones(pos[2]-pos[1]).cuda()
+                    pseudo_label[i, pos[0], pos[1]:pos[2], index[i]] = gt_nodes_[j] * torch.ones(pos[2]-pos[1]).cuda()
 
         return updated_x, nodes, nodes_label
 
@@ -196,7 +199,7 @@ class CAS_Module(nn.Module):
         super(CAS_Module, self).__init__()
         self.len_feature = len_feature
         self.self_train = self_train
-        self.se_layer = SELayer(channel=len_feature*2, reduction=16)
+        # self.se_layer = SELayer(channel=len_feature*2, reduction=16)
         self.conv = nn.Sequential(
             nn.Conv1d(in_channels=self.len_feature, out_channels=2048, kernel_size=3,
                       stride=1, padding=1),
@@ -232,7 +235,7 @@ class CAS_Module(nn.Module):
         # x: (B, T, F)
         # conv version to deremark
         out = x.permute(0, 2, 1)
-        out = self.se_layer(out)
+        # out = self.se_layer(out)
         # out: (B, F, T)
         out = self.conv(out)
         features = out.permute(0, 2, 1)
