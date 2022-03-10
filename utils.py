@@ -68,13 +68,12 @@ def grouping(arr):
     return np.split(arr, np.where(np.diff(arr) != 1)[0] + 1)
 
 
-def save_best_record_thumos(test_info, file_path, cls_thres, best_thres=None, mAP=False):
+def save_best_record_thumos(test_info, file_path, cls_thres, best_thres=None, map=False):
     fo = open(file_path, "w")
     fo.write("Step: {}\n".format(test_info["step"][-1]))
-    if mAP:
+    if map:
         fo.write("Test_acc: {:.4f}\n".format(test_info["test_acc"][-1]))
         fo.write("average_mAP: {:.4f}\n".format(test_info["average_mAP"][-1]))
-
         tIoU_thresh = np.linspace(0.1, 0.7, 7)
         for i in range(len(tIoU_thresh)):
             fo.write("mAP@{:.1f}: {:.4f}\n".format(tIoU_thresh[i],
@@ -83,25 +82,38 @@ def save_best_record_thumos(test_info, file_path, cls_thres, best_thres=None, mA
     # cls_thres = np.arange(0.1, 1, 0.1)
     fo.write("average_mIoU: {:.4f}\n".format(test_info["average_mIoU"][-1]))
     if best_thres is not None:
-        fo.write("best_thres: {:.2f}_{:.2f}\n".format(best_thres[0], best_thres[1]))
+        fo.write("best_mIoU_thres: {:.2f}_{:.2f}\n".format(best_thres[0], best_thres[1]))
     for i in range(len(cls_thres)):
         fo.write("mIoU@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i][0],
                                                        cls_thres[i][1],
                  test_info["mIoU@{:.2f}_{:.2f}".format(cls_thres[i][0], cls_thres[i][1])][-1]))
 
-    fo.write("average_bkg_mIoU: {:.4f}\n".format(test_info["average_bkg_mIoU"][-1]))
+    fo.write("average_precision: {:.4f}\n".format(test_info["average_precision"][-1]))
+    if best_thres is not None:
+        fo.write("best_precision_thres: {:.2f}_{:.2f}\n".format(best_thres[0], best_thres[1]))
     for i in range(len(cls_thres)):
-        fo.write("bkg_mIoU@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i][0],
-                                                           cls_thres[i][1],
-                 test_info["bkg_mIoU@{:.2f}_{:.2f}".format(cls_thres[i][0], cls_thres[i][1])][-1]))
+        fo.write("precision@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i][0],
+                                                       cls_thres[i][1],
+                 test_info["precision@{:.2f}_{:.2f}".format(cls_thres[i][0], cls_thres[i][1])][-1]))
 
-    fo.write("average_act_mIoU: {:.4f}\n".format(test_info["average_act_mIoU"][-1]))
+    fo.write("average_recall: {:.4f}\n".format(test_info["average_recall"][-1]))
+    if best_thres is not None:
+        fo.write("best_recall_thres: {:.2f}_{:.2f}\n".format(best_thres[0], best_thres[1]))
     for i in range(len(cls_thres)):
-        fo.write("act_mIoU@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i][0],
-                                                           cls_thres[i][1],
-                 test_info["act_mIoU@{:.2f}_{:.2f}".format(cls_thres[i][0], cls_thres[i][1])][-1]))
+        fo.write("recall@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i][0],
+                                                       cls_thres[i][1],
+                 test_info["recall@{:.2f}_{:.2f}".format(cls_thres[i][0], cls_thres[i][1])][-1]))
+
+    fo.write("average_f1score: {:.4f}\n".format(test_info["average_f1score"][-1]))
+    if best_thres is not None:
+        fo.write("best_f1score_thres: {:.2f}_{:.2f}\n".format(best_thres[0], best_thres[1]))
+    for i in range(len(cls_thres)):
+        fo.write("f1score@{:.2f}_{:.2f}: {:.4f}\n".format(cls_thres[i][0],
+                                                       cls_thres[i][1],
+                 test_info["f1score@{:.2f}_{:.2f}".format(cls_thres[i][0], cls_thres[i][1])][-1]))
 
     fo.close()
+
 
 
 def minmax_norm(act_map, min_val=None, max_val=None):
@@ -177,64 +189,42 @@ def get_cas(gt, cas):
     return cas_
 
 def calculate_iou(gt, pred_dict, cls_thres):
-    test_iou = np.zeros(len(cls_thres))
-    bkg_iou = np.zeros(len(cls_thres))
-    act_iou = np.zeros(len(cls_thres))
-    for video_name in pred_dict:
-        cas = pred_dict[video_name]
-        gt_video = gt[video_name]
-        iou_ = np.zeros(len(cls_thres))
-        bkg_iou_ = np.zeros(len(cls_thres))
-        act_iou_ = np.zeros(len(cls_thres))
-        for j, thres in enumerate(cls_thres):
-            bingo_count = 0
-            total_count = 0
-            bkg_count = 0
-            act_count = 0
-            all_count = 0
-            bkg_total_count = 0
+    iou = np.zeros(len(cls_thres))
+    precision = np.zeros(len(cls_thres))
+    recall = np.zeros(len(cls_thres))
+    f1score = np.zeros(len(cls_thres))
+
+    for j, thres in enumerate(cls_thres):
+        bingo_count = 0
+        total_count = 0
+        tp = tn = fp = fn = 0
+        for video_name in pred_dict:
+            cas = pred_dict[video_name]
+            gt_video = gt[video_name]
+ 
             for i in range(gt_video.shape[-1]):
                 if sum(gt_video[:, i]) > 0:
-                    all_count += len(gt_video[:, i])
                     gt_ = gt_video[:, i]
-                    
+                    _thres = cls_thres[j][0] * cas[:, i].mean() + cls_thres[j][1]
                     pred = np.ones_like(cas[:, i]) * -1
-                    pred[cas[:, i] <= thres[0]] = 0
-                    pred[cas[:, i] > thres[1]] = 1
-                    gt_ = gt_video[:, i][pred >= 0]
-                    pred = pred[pred >= 0]
-                    
-                    bingo_count += np.sum(gt_==pred)
-                    # recall (gt_) / precision (pred)
-                    bkg_count += np.sum(np.logical_and(gt_==pred,
-                                                       gt_==0))
-                    act_count += np.sum(np.logical_and(gt_==pred,
-                                                       gt_==1))
-                    total_count += len(pred)
-                    bkg_total_count += np.sum(gt_==0)
-            iou_[j] = bingo_count/total_count
-            if bkg_total_count == 0:
-                bkg_iou_[j] = 1
-            else:
-                bkg_iou_[j] = bkg_count/bkg_total_count
-            if total_count-bkg_total_count == 0:
-                act_iou_[j] = 0
-            else:
-                act_iou_[j] = act_count/(total_count-bkg_total_count)
-            assert(act_count+bkg_count == bingo_count)
-            # print(thres, round(total_count/all_count, 4),
-            #       'iou', round(iou_[j], 4),
-            #       'bkg_iou', round(bkg_iou_[j], 4),
-            #       'act_iou', round(act_iou_[j], 4))
-        test_iou += iou_
-        bkg_iou += bkg_iou_
-        act_iou += act_iou_
+                    pred[cas[:, i] <= _thres] = 0
+                    pred[cas[:, i] > _thres] = 1
 
-    test_iou = test_iou/len(pred_dict)
-    bkg_iou = bkg_iou/len(pred_dict)
-    act_iou = act_iou/len(pred_dict)
+                    bingo_count += np.sum(gt_==pred)
+                    total_count += len(pred)
+                    tp_ = np.sum(np.logical_and(gt_==pred, gt_==1))
+                    tn_ = np.sum(np.logical_and(gt_==pred, gt_==0))
+                    tp += tp_
+                    tn += tn_
+                    fp += (np.sum(pred) - tp_)
+                    fn += (np.sum(gt_) - tp_)
+
+        iou[j] = bingo_count/total_count
+        precision[j] = tp / (tp + fp + 1e-5)
+        recall[j] = tp / (tp + fn + 1e-5)
+        f1score[j] = 2*(precision[j]*recall[j])/(precision[j]+recall[j]+1e-5)
  
-    return test_iou, bkg_iou, act_iou
+    return iou, precision, recall, f1score
 
 
 def encode_onehot(labels):

@@ -111,11 +111,12 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
                 sup_pred_dict[vid_name[0]] = cas_
                 if save:
                     plot_pred(cas_, gt_vid, vid_name[0]+'_inner_seg_', savefig_path)
+
             to_draw = utils.get_cas(gt_vid, pseudo_label[0])
             # to_draw = to_draw.detach().cpu().numpy()
-            # for index in torch.where(label[0]==1)[0]:
-            #     to_draw[:, index] = savgol_filter(to_draw[:, index], 15, 3, mode= 'nearest')
-            plot_pred(to_draw, gt_vid, 'filter1-08' + vid_name[0]+'_inner_seg_', savefig_path)
+            for index in torch.where(label[0]==1)[0]:
+                to_draw[:, index] = savgol_filter(to_draw[:, index], 15, 5, mode= 'nearest')
+            plot_pred(to_draw, gt_vid, 'polynomial-15-5' + vid_name[0]+'_inner_seg_', savefig_path)
 
             if map:
                 pred = np.where(score_np >= config.class_thresh)[0]
@@ -207,10 +208,10 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
         # mIoU
         if config.test_head == 'sup' and config.supervision != 'weak':
             print('IoU on sup head')
-            test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, sup_pred_dict, cls_thres)
+            test_iou, precision, recall, f1score = utils.calculate_iou(gt, sup_pred_dict, cls_thres)
         else:
             print('IoU on wtal head')
-            test_iou, bkg_iou, act_iou = utils.calculate_iou(gt, wtal_pred_dict, cls_thres)
+            test_iou, precision, recall, f1score = utils.calculate_iou(gt, wtal_pred_dict, cls_thres)
 
         # Update logger
         if map:
@@ -223,13 +224,17 @@ def test(net, gcnn, config, logger, test_loader, test_info, step, gt,
         for i in range(len(cls_thres)):
             logger.log_value('mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
             
-        logger.log_value('Average bkg mIoU', bkg_iou.mean(), step)
+        test_info['average_precision'].append(precision.mean())
         for i in range(len(cls_thres)):
-            logger.log_value('bkg_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
+            test_info['precision@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(precision[i])
 
-        logger.log_value('Average act mIoU', act_iou.mean(), step)
+        test_info['average_recall'].append(recall.mean())
         for i in range(len(cls_thres)):
-            logger.log_value('act_mIoU@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1]), test_iou[i], step)
+            test_info['recall@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(recall[i])
+
+        test_info['average_f1score'].append(recall.mean())
+        for i in range(len(cls_thres)):
+            test_info['f1score@{:.2f}_{:.2f}'.format(cls_thres[i][0], cls_thres[i][1])].append(f1score[i])
 
         # Update test info
         test_info['step'].append(step)

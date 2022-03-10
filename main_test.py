@@ -50,15 +50,20 @@ if __name__ == "__main__":
 
     thres = np.arange(0.1, 1, 0.1)
     # cls_thres = [(round(t_l, 2), round(t_h, 2)) for i, t_l in enumerate(thres) for t_h in thres[i:]]
-    cls_thres = [(round(t_h, 2), round(t_h, 2))for t_h in thres]
+    ratio = np.arange(0, 1.5, 0.1)
+    bias = np.arange(-1, 1, 0.1)
+    cls_thres = [(round(ratio[i], 2), round(bias[i], 2)) for i in range(len(thres))]
     test_info = {"step": [], "test_acc": [],
-                 "average_mAP": [],
-                 "mAP@0.1": [], "mAP@0.2": [], "mAP@0.3": [], 
-                 "mAP@0.4": [], "mAP@0.5": [], "mAP@0.6": [], "mAP@0.7": [],
-                 "average_mIoU": [], "average_bkg_mIoU": [], "average_act_mIoU": []}
+                "average_mAP": [],
+                "mAP@0.1": [], "mAP@0.2": [], "mAP@0.3": [], "mAP@0.4": [],
+                "mAP@0.5": [], "mAP@0.6": [], "mAP@0.7": [],
+                "average_mIoU": [], "average_precision": [], "average_recall": [], "average_f1score": [],
+                "best_mIoU_thres": [], "best_precision_thres": [],
+                "best_recall_thres": [], "best_f1score_thres": []}
     iou_info = {'mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1]): [] for thres in cls_thres}
-    iou_info.update({'bkg_mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1]): [] for thres in cls_thres})
-    iou_info.update({'act_mIoU@{:.2f}_{:.2f}'.format(thres[0], thres[1]): [] for thres in cls_thres})
+    iou_info.update({'precision@{:.2f}_{:.2f}'.format(thres[0], thres[1]): [] for thres in cls_thres})
+    iou_info.update({'recall@{:.2f}_{:.2f}'.format(thres[0], thres[1]): [] for thres in cls_thres})
+    iou_info.update({'f1score@{:.2f}_{:.2f}'.format(thres[0], thres[1]): [] for thres in cls_thres})
     test_info.update(iou_info)
 
     logger = Logger(config.log_path)
