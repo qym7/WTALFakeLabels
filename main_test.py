@@ -21,12 +21,17 @@ if __name__ == "__main__":
     config = Config(args)
     worker_init_fn = None
 
+    import pdb
+    pdb.set_trace()
+
     if config.seed >= 0:
         utils.set_seed(config.seed)
         worker_init_fn = np.random.seed(config.seed)
 
     if config.test_dataset == 'test':
         utils.save_config(config, os.path.join(config.output_path, "config.txt"))
+
+    pdb.set_trace()
 
     net = Model(config.len_feature, config.num_classes, 
                 config.r_act, config.r_bkg,

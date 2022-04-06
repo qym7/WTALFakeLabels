@@ -171,7 +171,7 @@ def save_config(config, file_path):
     fo.write("Configurtaions:\n")
     fo.write(str(config))
     fo.close()
-    
+
     
 def get_free_gpu():
     os.system('nvidia-smi -q -d Memory |grep -A4 GPU|grep Free >tmp')
@@ -193,6 +193,10 @@ def calculate_iou(gt, pred_dict, cls_thres):
     precision = np.zeros(len(cls_thres))
     recall = np.zeros(len(cls_thres))
     f1score = np.zeros(len(cls_thres))
+    tp_lst = np.zeros(len(cls_thres))
+    tn_lst = np.zeros(len(cls_thres))
+    fp_lst = np.zeros(len(cls_thres))
+    fn_lst = np.zeros(len(cls_thres))
 
     for j, thres in enumerate(cls_thres):
         bingo_count = 0
@@ -223,8 +227,13 @@ def calculate_iou(gt, pred_dict, cls_thres):
         precision[j] = tp / (tp + fp + 1e-5)
         recall[j] = tp / (tp + fn + 1e-5)
         f1score[j] = 2*(precision[j]*recall[j])/(precision[j]+recall[j]+1e-5)
+        tp_lst[j] = tp
+        tn_lst[j] = tn
+        fp_lst[j] = fp
+        fn_lst[j] = fn
  
-    return iou, precision, recall, f1score
+    return fp_lst, fn_lst, tp_lst, tn_lst
+    # return iou, precision, recall, f1score
 
 
 def encode_onehot(labels):

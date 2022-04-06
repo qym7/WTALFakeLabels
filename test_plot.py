@@ -17,6 +17,7 @@ ANNOT_PATH = '/GPFS/data/yimingqin/code/PTAL/dataset/thumos_annotations'
 savefig_path='/GPFS/data/yimingqin/code/PTAL/outputs/LACP-n-5000/polynomial_filter'
 save_path='/GPFS/data/yimingqin/code/PTAL/outputs/LACP-n-5000/'
 
+
 if __name__ == "__main__":
     with open(os.path.join(ANNOT_PATH,
                            'val_gt_25.pickle'), 'rb') as f:
@@ -38,13 +39,18 @@ if __name__ == "__main__":
     
     thres = np.arange(0.1, 1, 0.1)
     cls_thres = [(round(i, 2), round(i, 2)) for i in thres]
-    test_iou, precision, recall, f1score = utils.calculate_iou(gt, pseudo_label, cls_thres)
+    # test_iou, precision, recall, f1score = utils.calculate_iou(gt, pseudo_label, cls_thres)
+    fp, fn, tp, tn = utils.calculate_iou(gt, pseudo_label, cls_thres)
+    print('fp', fp)
+    print('fn', fn)
+    print('tp', tp)
+    print('tn', tn)
 
-    fo = open(os.path.join(save_path, '17-5-res.txt'), "w")
-    fo.write("best iou: {}\n".format(max(test_iou)))
-    fo.write("best f1score: {}\n".format(max(f1score)))
-    for i in range(len(cls_thres)):
-        fo.write("thres: {}\n".format(cls_thres[i]))
-        fo.write("iou: {}\n".format(test_iou[i]))
-        fo.write("f1score: {}\n".format(f1score[i]))
-    fo.close()
+    # fo = open(os.path.join(save_path, '17-5-res.txt'), "w")
+    # fo.write("best iou: {}\n".format(max(test_iou)))
+    # fo.write("best f1score: {}\n".format(max(f1score)))
+    # for i in range(len(cls_thres)):
+    #     fo.write("thres: {}\n".format(cls_thres[i]))
+    #     fo.write("iou: {}\n".format(test_iou[i]))
+    #     fo.write("f1score: {}\n".format(f1score[i]))
+    # fo.close()
